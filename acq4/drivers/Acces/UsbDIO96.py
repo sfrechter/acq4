@@ -2,6 +2,7 @@ from ctypes import cdll
 
 from ... import getManager
 
+# TODO: relay to <jhentges@accesio.com> when this is done
 
 class UsbDIO96:
     """
