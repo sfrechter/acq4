@@ -1,21 +1,18 @@
 from __future__ import annotations
+
+import ctypes
 from ctypes import (
-    cdll,
-    c_int,
-    create_string_buffer,
     byref,
-    c_longlong,
     c_ubyte,
-    c_long,
-    c_short,
-    c_double,
     c_ulong,
     CFUNCTYPE,
     c_uint32,
     POINTER,
-    c_uint16, c_int64,
+    c_uint16,
+    c_int64,
 )
-from typing import Optional, Any, Union, Iterable
+from ctypes.util import find_library
+from typing import Any, Union, Iterable
 
 from ... import getManager
 
@@ -50,18 +47,21 @@ class UsbDIO96:
     val = dev.read(11)
     """
 
-    _lib_path = "AIOUSB.dll"
-    _lib: Optional[cdll._DLLT] = None
+    _lib_path = None
+    _lib = None
 
     @classmethod
     def set_library_path(cls, path: str) -> None:
         cls._lib_path = path
 
     @classmethod
-    def get_library(cls) -> cdll._DLLT:
+    def get_library(cls):
         if cls._lib is None:
-            cls._lib = cdll.LoadLibrary(cls._lib_path)
-            # TODO sanity/version check?
+            if cls._lib_path is None:
+                cls._lib_path = find_library("AIOUSB")
+            if cls._lib_path is None:
+                cls._lib_path = "AIOUSB.dll"
+            cls._lib = ctypes.windll.LoadLibrary(cls._lib_path)
         return cls._lib
 
     @classmethod
@@ -70,7 +70,6 @@ class UsbDIO96:
         return [i for i in range(32) if (1 << i) & bitmask]
 
     def __init__(self, dev_id: int = DEFAULT_SINGLE_DEVICE_ID) -> None:
-        self.get_library()
         self._id = dev_id
         self._port_mask = (c_ubyte * 2)(0)  # bit mask of which ports are configured as OUTPUT
         self._port_io = (c_ubyte * 12)(0)  # data written to the ports whenever they're configured as OUTPUT
