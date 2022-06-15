@@ -43,7 +43,7 @@ class UsbDIO96:
     dev = UsbDIO96()
     print(f"Connected to DIO96 device with serial number 0x{dev.get_serial_number:x}")
     dev.configure(OUTPUT, [0, 1, 2])
-    dev.write(0, 0xf0)
+    dev.write(0, 0xff)
     val = dev.read(11)
     """
 
