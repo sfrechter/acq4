@@ -20,7 +20,7 @@ from typing import Optional, Any, Union, Iterable
 from ... import getManager
 
 # TODO: relay to <jhentges@accesio.com> when this is done
-__all__ = ["UsbDIO96", "AccesError"]
+__all__ = ["UsbDIO96", "AccesError", "INPUT", "OUTPUT"]
 ADCCallbackType = CFUNCTYPE(c_uint32, POINTER(c_uint16), c_uint32, c_uint32, c_uint32)
 DEFAULT_SINGLE_DEVICE_ID = -3
 RETCODE_ERROR_DOCS = \
@@ -74,6 +74,9 @@ class UsbDIO96:
         self._id = dev_id
         self._port_mask = (c_ubyte * 2)(0)  # bit mask of which ports are configured as OUTPUT
         self._port_io = (c_ubyte * 12)(0)  # data written to the ports whenever they're configured as OUTPUT
+
+    def __str__(self) -> str:
+        return f"<UsbDIO96 device {self._id}>"
 
     def call(self, fn_name: str, *args) -> Any:
         fn = getattr(self._lib, fn_name)
