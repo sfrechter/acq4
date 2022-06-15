@@ -22,16 +22,9 @@ from ... import getManager
 # TODO: relay to <jhentges@accesio.com> when this is done
 __all__ = ["UsbDIO96", "AccesError"]
 ADCCallbackType = CFUNCTYPE(c_uint32, POINTER(c_uint16), c_uint32, c_uint32, c_uint32)
-DEFAULT_SINGLE_DEVICE_ID = 0
+DEFAULT_SINGLE_DEVICE_ID = -3
 RETCODE_ERROR_DOCS = \
     "https://accesio.com/MANUALS/USB%20Software%20Reference%20Manual.html#About%20Error/Status%20Return%20Values"
-
-
-def _copy_str_into_c(s):
-    buf = create_string_buffer(len(s))
-    for i in range(len(s)):
-        buf[i] = s[i]
-    return buf
 
 
 class AccesError(Exception):
@@ -72,9 +65,9 @@ class UsbDIO96:
         return cls._lib
 
     @classmethod
-    def get_device_count(cls) -> int:
-        """TODO does this return a bitmask of all detected device indices or a count."""
-        return cls.get_library().GetDevices()
+    def get_device_ids(cls) -> list[int]:
+        bitmask = cls.get_library().GetDevices()
+        return [i for i in range(32) if (1 << i) & bitmask]
 
     def __init__(self, dev_id: int = DEFAULT_SINGLE_DEVICE_ID) -> None:
         self.get_library()
@@ -118,7 +111,7 @@ class UsbDIO96:
         """
         Write to a single byte-worth of digital outputs on a device.
 
-        Bytes written to ports configured as “input” are ignored.
+        Bytes written to any ports configured as “input” are ignored.
         """
         return self.call("DIO_Write8", c_ulong(port), c_ubyte(data))
 
