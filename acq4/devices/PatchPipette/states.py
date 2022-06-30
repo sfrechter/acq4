@@ -171,7 +171,7 @@ class PatchPipetteState(Future):
         except Exception as exc:
             # state aborted due to an error
             interrupted = True
-            printExc(f"Error in {self.dev.name()} state {self.stateName}")
+            printExc(f"{type(exc)} error in {self.dev.name()} state {self.stateName}")
             error = str(exc)
             excInfo = sys.exc_info()
         else:
