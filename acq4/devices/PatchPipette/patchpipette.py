@@ -226,13 +226,6 @@ class PatchPipette(Device):
     def setSelected(self):
         pass
 
-    def seal(self):
-        """Attempt to seal onto a cell.
-
-        * switches to VC holding after passing 100 MOhm
-        * increase suction if seal does not form
-        """
-
     def setState(self, state, setActive=True):
         """Attempt to set the state (out, bath, seal, whole cell, etc.) of this patch pipette.
 
@@ -265,14 +258,6 @@ class PatchPipette(Device):
 
     def getState(self):
         return self._stateManager.getState()
-
-    def breakIn(self):
-        """Rupture the cell membrane using negative current pulses.
-
-        * -2 psi for 3 sec or until rupture
-        * -4, -6, -8 psi if needed
-        * longer wait time if needed
-        """
 
     def _pipetteCalibrationChanged(self):
         self.calibrated = True

@@ -159,6 +159,7 @@ class PatchPipetteState(Future):
         """
         error = None
         excInfo = None
+        interrupted = False
         try:
             # run must be reimplemented in subclass and call self._checkStop() frequently
             self.nextState = self.run()
@@ -170,7 +171,7 @@ class PatchPipetteState(Future):
         except Exception as exc:
             # state aborted due to an error
             interrupted = True
-            printExc("Error in %s state %s" % (self.dev.name(), self.stateName))
+            printExc(f"Error in {self.dev.name()} state {self.stateName}")
             error = str(exc)
             excInfo = sys.exc_info()
         else:
