@@ -1,10 +1,11 @@
-from __future__ import print_function, division
-
-import time, sys, threading, traceback, functools
-
-from pyqtgraph import ptime
+import functools
+import inspect
+import threading
+import time
+import traceback
 
 from acq4.util import Qt
+from pyqtgraph import ptime
 
 
 class Future(Qt.QObject):
@@ -59,7 +60,7 @@ class Future(Qt.QObject):
 
         Must be reimplemented in subclasses.
         """
-        raise NotImplementedError("method must be reimplmented in subclass")
+        raise NotImplementedError("method must be reimplemented in subclass")
 
     def stop(self, reason="task stop requested"):
         """Stop the task (nicely).
@@ -81,7 +82,7 @@ class Future(Qt.QObject):
         """Called by subclasses when the task is done (regardless of the reason)
         """
         if self._isDone:
-            raise Exception("_taskDone has already been called.")
+            raise RuntimeError("_taskDone has already been called.")
         self._isDone = True
         if error is not None:
             # error message may have been set earlier
@@ -89,7 +90,7 @@ class Future(Qt.QObject):
         self._excInfo = excInfo
         self._wasInterrupted = interrupted
         if interrupted:
-            self.setState(state or 'interrupted: %s' % error)
+            self.setState(state or f'interrupted: {error}')
         else:
             self.setState(state or 'complete')
         self.finishedEvent.set()
@@ -134,12 +135,15 @@ class Future(Qt.QObject):
                 self._wait(pollInterval)
         
         if self.wasInterrupted():
-            err = self.errorMessage()
-            if err is None:
-                # This would be a fantastic place to "raise from self._excInfo[1]" once we move to py3
-                raise RuntimeError(f"Task {self} did not complete (no error message).")
+            msg = self.errorMessage()
+            if msg is None:
+                err = RuntimeError(f"Task {self} did not complete (no error message).")
             else:
-                raise RuntimeError(f"Task {self} did not complete: {err}")
+                err = RuntimeError(f"Task {self} did not complete: {msg}")
+            if self._excInfo is not None:
+                raise err from self._excInfo[1]
+            else:
+                raise err
 
     def _wait(self, duration):
         """Default sleep implementation used by wait(); may be overridden to return early.
@@ -163,7 +167,7 @@ class Future(Qt.QObject):
             if now > stop:
                 return
             
-            time.sleep(max(0, min(0.1, stop-now)))
+            time.sleep(max(0., min(0.1, stop-now)))
             if self._stopRequested:
                 raise self.StopRequested()
 
@@ -215,8 +219,10 @@ class Future(Qt.QObject):
         """
         if self._errorMonitorThread is not None:
             return
-        originalFrame = sys._getframe().f_back
-        monitorFn = functools.partial(self._monitorErrors, message=message, pollInterval=pollInterval, originalFrame=originalFrame)
+        originalFrame = inspect.currentframe().f_back
+        monitorFn = functools.partial(
+            self._monitorErrors, message=message, pollInterval=pollInterval, originalFrame=originalFrame
+        )
         self._errorMonitorThread = threading.Thread(target=monitorFn, daemon=True)
         self._errorMonitorThread.start()
 
@@ -232,34 +238,8 @@ class Future(Qt.QObject):
             try:
                 formattedMsg = message.format(stack=stack, error=traceback.format_exception_only(type(exc), exc))
             except Exception as exc2:
-                formattedMsg = message + f" [additional error formatting error message: {exc2}]"
+                formattedMsg = f"{message} [additional error formatting error message: {exc2}]"
             raise RuntimeError(formattedMsg) from exc
-
-
-
-class _FuturePollThread(threading.Thread):
-    """Thread used to poll the state of a future.
-    
-    Used when a Future subclass does not automatically call _taskDone, but instead requires
-    a periodic check. May
-    """
-    def __init__(self, future, pollInterval, originalFrame):
-        threading.Thread.__init__(self, daemon=True)
-        self.future = future
-        self.pollInterval = pollInterval
-        self._stop = False
-
-    def run(self):
-        while not self._stop:
-            if self.future.isDone():
-                break
-                if self.future._raiseErrors:
-                    raise
-            time.sleep(self.pollInterval)
-
-    def stop(self):
-        self._stop = True
-        self.join()
 
 
 class MultiFuture(Future):
@@ -275,17 +255,16 @@ class MultiFuture(Future):
         return Future.stop(self, reason)
 
     def percentDone(self):
-        return min([f.percentDone() for f in self.futures])
+        return min(f.percentDone() for f in self.futures)
 
     def wasInterrupted(self):
-        return any([f.wasInterrupted() for f in self.futures])
+        return any(f.wasInterrupted() for f in self.futures)
 
     def isDone(self):
-        return all([f.isDone() for f in self.futures])
+        return all(f.isDone() for f in self.futures)
 
     def errorMessage(self):
         return "; ".join([f.errorMessage() or '' for f in self.futures])
 
     def currentState(self):
         return "; ".join([f.currentState() or '' for f in self.futures])
-

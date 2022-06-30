@@ -1,21 +1,18 @@
-# -*- coding: utf-8 -*-
-from __future__ import division, print_function
-
+import contextlib
 import math
+import sys
 import threading
 from typing import Tuple
 
-import time
-
-from acq4.util import Qt, ptime
 import numpy as np
-from acq4.util.Mutex import Mutex
+from six.moves import range
+
 import pyqtgraph as pg
+from acq4.util import Qt
+from acq4.util.Mutex import Mutex
 from .calibration import ManipulatorAxesCalibrationWindow, StageAxesCalibrationWindow
 from ..Device import Device
 from ..OptomechDevice import OptomechDevice
-from six.moves import range
-
 from ... import getManager
 from ...util.future import Future
 
@@ -72,30 +69,30 @@ class Stage(Device, OptomechDevice):
         self._inverseAxisTransform = None
         self._calculatedXAxisOrientation = None
 
-        self._defaultSpeed = 'fast'
-        self.setFastSpeed(config.get('fastSpeed', 1e-3))
-        self.setSlowSpeed(config.get('slowSpeed', 10e-6))
+        self._defaultSpeed = "fast"
+        self.setFastSpeed(config.get("fastSpeed", 1e-3))
+        self.setSlowSpeed(config.get("slowSpeed", 10e-6))
 
         self._limits = [(None, None)] * nAxes
-        if 'limits' in config:
-            self.setLimits(**config['limits'])
+        if "limits" in config:
+            self.setLimits(**config["limits"])
 
         self._progressDialog = None
         self._progressTimer = Qt.QTimer()
         self._progressTimer.timeout.connect(self.updateProgressDialog)
 
-        calibration = self.readConfigFile('calibration')
-        axisTr = calibration.get('transform', None)
+        calibration = self.readConfigFile("calibration")
+        axisTr = calibration.get("transform", None)
         if axisTr is not None:
             self._axisTransform = pg.Transform3D(axisTr)
 
         # set up joystick callbacks if requested
         jsdevs = set()
-        self._jsAxes = set()   # just used to listen for specific events
+        self._jsAxes = set()  # just used to listen for specific events
         self._jsButtons = set()
-        if 'joystick' in config:
-            for axis, axcfg in config['joystick'].items():
-                jsname, jsaxis = axcfg['axis']
+        if "joystick" in config:
+            for axis, axcfg in config["joystick"].items():
+                jsname, jsaxis = axcfg["axis"]
                 try:
                     js = dm.getDevice(jsname)
                 except Exception:
@@ -103,13 +100,13 @@ class Stage(Device, OptomechDevice):
                     continue
                 jsdevs.add(js)
                 self._jsAxes.add((js, jsaxis))
-                for jsname, button, scale in axcfg.get('modifiers', []):
+                for jsname, button, scale in axcfg.get("modifiers", []):
                     js = dm.getDevice(jsname)
                     self._jsButtons.add((js, button))
         for jsdev in jsdevs:
             jsdev.sigStateChanged.connect(self.joystickChanged)
 
-        dm.declareInterface(name, ['stage'], self)
+        dm.declareInterface(name, ["stage"], self)
 
     def quit(self):
         self.stop()
@@ -159,9 +156,9 @@ class Stage(Device, OptomechDevice):
         """Return a speed in m/s where the argument *speed* can be any of
         'fast', 'slow', or a float m/s.
         """
-        if speed == 'fast':
+        if speed == "fast":
             speed = self.fastSpeed
-        elif speed == 'slow':
+        elif speed == "slow":
             speed = self.slowSpeed
         return speed
 
@@ -207,10 +204,9 @@ class Stage(Device, OptomechDevice):
 
         The default implementation simply inverts _axisTransform to generate this solution;
         devices with more complex kinematics need to reimplement this method.
-        """ 
+        """
         tr = self.stageTransform().getTranslation() + pg.Vector(posChange)
-        pos = pg.Vector(self.inverseAxisTransform().map(tr))
-        return pos
+        return pg.Vector(self.inverseAxisTransform().map(tr))
 
     def axisTransform(self) -> pg.Transform3D:
         """Transformation matrix with columns that point in the direction that each manipulator axis moves.
@@ -224,7 +220,7 @@ class Stage(Device, OptomechDevice):
         if self._axisTransform is None:
             self._axisTransform = pg.Transform3D()
             self._inverseAxisTransform = pg.Transform3D()
-            scale = self.config.get('scale', None)
+            scale = self.config.get("scale", None)
             if scale is not None:
                 self._axisTransform.scale(*scale)
                 self._inverseAxisTransform.scale(*[1.0 / x for x in scale])
@@ -246,7 +242,7 @@ class Stage(Device, OptomechDevice):
             globalz = pg.Vector([0, 0, 1])
             pitch = xaxis.angle(globalz) - 90
             yaw = np.arctan2(xaxis[1], xaxis[0]) * 180 / np.pi
-            self._calculatedXAxisOrientation = {'pitch': pitch, 'yaw': yaw}
+            self._calculatedXAxisOrientation = {"pitch": pitch, "yaw": yaw}
         return self._calculatedXAxisOrientation
 
     def calculatedYaw(self) -> float:
@@ -269,8 +265,7 @@ class Stage(Device, OptomechDevice):
         stagePos.
         """
         offset = pg.transformCoordinates(self.inverseBaseTransform(), parentPos, transpose=True) - localPos
-        m = pg.solve3DTransform(stagePos[:4], offset[:4])[:3]
-        return m
+        return pg.solve3DTransform(stagePos[:4], offset[:4])[:3]
 
     def posChanged(self, pos):
         """Handle device position changes by updating the device transform and
@@ -377,14 +372,14 @@ class Stage(Device, OptomechDevice):
         possible, or 'slow' to indicate the device should minimize vibrations
         while moving.        
         """
-        if speed not in ('fast', 'slow'):
+        if speed not in ("fast", "slow"):
             speed = abs(float(speed))
         self._defaultSpeed = speed
 
     def isMoving(self):
         """Return True if the device is currently moving.
         """
-        raise NotImplementedError()        
+        raise NotImplementedError()
 
     def move(self, position, speed=None, progress=False, linear=False, **kwds):
         """Move the device to a new position.
@@ -412,7 +407,7 @@ class Stage(Device, OptomechDevice):
         mfut = self._move(position, speed=speed, linear=linear, **kwds)
 
         if progress:
-            self._progressDialog = Qt.QProgressDialog("%s moving..." % self.name(), None, 0, 100)
+            self._progressDialog = Qt.QProgressDialog(f"{self.name()} moving...", None, 0, 100)
             self._progressDialog.mf = mfut
             self._progressTimer.start(100)
 
@@ -458,9 +453,9 @@ class Stage(Device, OptomechDevice):
         """Helper function to convert absolute position (possibly
         containing Nones) to an absolute position.
         """
-        if any([x is None for x in abs]):
+        if any(x is None for x in abs):
             pos = self.getPosition()
-            for i,x in enumerate(abs):
+            for i, x in enumerate(abs):
                 if x is not None:
                     pos[i] = x
         else:
@@ -511,7 +506,7 @@ class Stage(Device, OptomechDevice):
             if limit is None:
                 continue
             assert len(limit) == 2
-            if self.capabilities()['limits'][axis] is True:
+            if self.capabilities()["limits"][axis] is True:
                 self._setHardwareLimits(axis=axis, limit=limit)
             if tuple(self._limits[axis]) != tuple(limit):
                 changed.append(axis)
@@ -525,30 +520,34 @@ class Stage(Device, OptomechDevice):
         """
         return self._limits[:]
 
-    def _setHardwareLimits(self, axis:int, limit:tuple):
+    def _setHardwareLimits(self, axis: int, limit: tuple):
         raise NotImplementedError("Must be implemented in subclass.")
 
     def checkLimits(self, pos):
         """Raise an exception if *pos* is outside the configured limits"""
         for axis, limit in enumerate(self._limits):
-            ax_name = 'xyz'[axis]
+            ax_name = "xyz"[axis]
             x = pos[axis]
             if x is None:
                 continue
             if limit[0] is not None and x < limit[0]:
-                raise ValueError(f"Position requested for device {self.name()} exceeds limits: {pos} {ax_name} axis < {limit[0]}")
+                raise ValueError(
+                    f"Position requested for device {self.name()} exceeds limits: {pos} {ax_name} axis < {limit[0]}"
+                )
             if limit[1] is not None and x > limit[1]:
-                raise ValueError(f"Position requested for device {self.name()} exceeds limits: {pos} {ax_name} axis > {limit[1]}")
+                raise ValueError(
+                    f"Position requested for device {self.name()} exceeds limits: {pos} {ax_name} axis > {limit[1]}"
+                )
 
     def homePosition(self):
         """Return the stored home position of this stage in global coordinates.
         """
-        return self.readConfigFile('stored_locations').get('home', None)
+        return self.readConfigFile("stored_locations").get("home", None)
 
-    def goHome(self, speed='fast'):
+    def goHome(self, speed="fast"):
         homePos = self.homePosition()
         if homePos is None:
-            raise Exception("No home position set for %s" % self.name())
+            raise Exception(f"No home position set for {self.name()}")
         return self.moveToGlobal(homePos, speed=speed)
 
     def setHomePosition(self, pos=None):
@@ -556,31 +555,31 @@ class Stage(Device, OptomechDevice):
         """
         if pos is None:
             pos = self.globalPosition()
-        locations = self.readConfigFile('stored_locations')
-        locations['home'] = list(pos)
-        self.writeConfigFile(locations, 'stored_locations')
+        locations = self.readConfigFile("stored_locations")
+        locations["home"] = list(pos)
+        self.writeConfigFile(locations, "stored_locations")
 
     def joystickChanged(self, js, event):
-        if 'axis' in event:
-            ax = event['axis']
+        if "axis" in event:
+            ax = event["axis"]
             if (js, ax) not in self._jsAxes:
                 return
         else:
-            btn = event['button']
+            btn = event["button"]
             if (js, btn) not in self._jsButtons:
                 return
 
         # calculate new velocity
         jsStates = {}
         vel = [None, None, None]
-        for axis, axcfg in self.config['joystick'].items():
+        for axis, axcfg in self.config["joystick"].items():
             axis = int(axis)
-            jsname, jsaxis = axcfg['axis']
+            jsname, jsaxis = axcfg["axis"]
             state = jsStates.setdefault(jsname, self.dm.getDevice(jsname).state())
-            vel[axis] = axcfg['speed'] * state['axes'][jsaxis]
-            for jsname, button, scale in axcfg.get('modifiers', []):
+            vel[axis] = axcfg["speed"] * state["axes"][jsaxis]
+            for jsname, button, scale in axcfg.get("modifiers", []):
                 state = jsStates.setdefault(jsname, self.dm.getDevice(jsname).state())
-                if state['buttons'][button]:
+                if state["buttons"][button]:
                     vel[axis] *= scale
 
         self.setVelocity(vel)
@@ -589,6 +588,7 @@ class Stage(Device, OptomechDevice):
 class MoveFuture(Future):
     """Used to track the progress of a requested move operation.
     """
+
     class Timeout(Exception):
         """Raised by wait() if the timeout period elapses.
         """
@@ -613,8 +613,8 @@ class MoveFuture(Future):
         s = np.array(self.startPos)
         t = np.array(self.targetPos)
         p = np.array(self.dev.getPosition())
-        d1 = ((p - s)**2).sum()**0.5
-        d2 = ((t - s)**2).sum()**0.5
+        d1 = ((p - s) ** 2).sum() ** 0.5
+        d2 = ((t - s) ** 2).sum() ** 0.5
         if d2 == 0:
             return 100
         return 100 * d1 / d2
@@ -634,14 +634,11 @@ class MovePathFuture(MoveFuture):
         self.path = path
         self.currentStep = 0
         self._currentFuture = None
-        self._done = False
-        self._wasInterrupted = False
-        self._errorMessage = None
 
         for step in self.path:
             if step.get("globalPos") is not None:
                 step["position"] = dev.mapGlobalToDevicePosition(step.pop("globalPos"))
-        for i,step in enumerate(self.path):
+        for i, step in enumerate(self.path):
             try:
                 self.dev.checkMove(**step)
             except Exception as exc:
@@ -654,17 +651,7 @@ class MovePathFuture(MoveFuture):
         fut = self._currentFuture
         if fut is None:
             return 0.0
-        pd = (100 * fut._pathStep + fut.percentDone()) / len(self.path)
-        return pd
-
-    def isDone(self):
-        return self._done
-
-    def wasInterrupted(self):
-        return self._wasInterrupted
-
-    def errorMessage(self):
-        return self._errorMessage
+        return (100 * fut._pathStep + fut.percentDone()) / len(self.path)
 
     def stop(self, reason=None):
         fut = self._currentFuture
@@ -679,38 +666,36 @@ class MovePathFuture(MoveFuture):
                 fut._pathStep = i
                 self._currentFuture = fut
                 while not fut.isDone():
-                    try:
+                    with contextlib.suppress(fut.Timeout):
                         fut.wait(timeout=0.1)
                         self.currentStep = i + 1
-                    except fut.Timeout:
-                        pass
                     if self._stopRequested:
                         fut.stop()
                         break
-                
                 if self._stopRequested:
                     self._errorMessage = "Move was cancelled"
                     self._wasInterrupted = True
                     break
 
                 if fut.wasInterrupted():
-                    self._errorMessage = "Path step %d/%d: %s" % (i+1, len(self.path), fut.errorMessage())
+                    self._errorMessage = f"Path step {i + 1}/{len(self.path)}: {fut.errorMessage()}"
                     self._wasInterrupted = True
                     break
         except Exception as exc:
-            self._errorMessage = "Error in path move thread: %s" % exc
+            self._errorMessage = f"Error in path move thread: {type(exc)}({exc})"
+            self._excInfo = sys.exc_info()
             self._wasInterrupted = True
         finally:
-            self._done = True
+            self._isDone = True
 
     def undo(self):
         """Reverse the moves generated in this future and return a new future.
         """
-        fwdPath = [{'position': self.startPos}] + self.path[:]
+        fwdPath = [{"position": self.startPos}] + self.path[:]
         revPath = []
-        for i in range(min(self.currentStep, len(self.path)-1), -1, -1):
-            step = fwdPath[i+1].copy()
-            step['position'] = fwdPath[i]['position']
+        for i in range(min(self.currentStep, len(self.path) - 1), -1, -1):
+            step = fwdPath[i + 1].copy()
+            step["position"] = fwdPath[i]["position"]
             revPath.append(step)
         return self.dev.movePath(revPath)
 
@@ -733,27 +718,27 @@ class StageInterface(Qt.QWidget):
         self.positionLabelWidget.setLayout(self.positionLabelLayout)
         self.positionLabelLayout.setContentsMargins(0, 0, 0, 0)
 
-        self.globalLabel = Qt.QLabel('global')
+        self.globalLabel = Qt.QLabel("global")
         self.positionLabelLayout.addWidget(self.globalLabel, 0, 1)
         if dev.isManipulator:
-            self.stageLabel = Qt.QLabel('manipulator')
+            self.stageLabel = Qt.QLabel("manipulator")
         else:
-            self.stageLabel = Qt.QLabel('stage')
+            self.stageLabel = Qt.QLabel("stage")
         self.positionLabelLayout.addWidget(self.stageLabel, 0, 2)
 
         cap = dev.capabilities()
         for axis, axisName in enumerate(self.dev.axes()):
-            if cap['getPos'][axis]:
+            if cap["getPos"][axis]:
                 axLabel = Qt.QLabel(axisName)
                 axLabel.setMaximumWidth(15)
-                globalPosLabel = Qt.QLabel('0')
-                stagePosLabel = Qt.QLabel('0')
+                globalPosLabel = Qt.QLabel("0")
+                stagePosLabel = Qt.QLabel("0")
                 self.posLabels[axis] = (globalPosLabel, stagePosLabel)
                 widgets = [axLabel, globalPosLabel, stagePosLabel]
-                if cap['limits'][axis]:
-                    minCheck = Qt.QCheckBox('Min:')
+                if cap["limits"][axis]:
+                    minCheck = Qt.QCheckBox("Min:")
                     minCheck.tag = (axis, 0)
-                    maxCheck = Qt.QCheckBox('Max:')
+                    maxCheck = Qt.QCheckBox("Max:")
                     maxCheck.tag = (axis, 1)
                     self.limitChecks[axis] = (minCheck, maxCheck)
                     widgets.extend([minCheck, maxCheck])
@@ -761,7 +746,7 @@ class StageInterface(Qt.QWidget):
                         check.clicked.connect(self.limitCheckClicked)
 
                 nextRow = self.positionLabelLayout.rowCount()
-                for i,w in enumerate(widgets):
+                for i, w in enumerate(widgets):
                     self.positionLabelLayout.addWidget(w, nextRow, i)
                 self.axCtrls[axis] = widgets
 
@@ -771,15 +756,15 @@ class StageInterface(Qt.QWidget):
         self.layout.addWidget(self.btnContainer, self.layout.rowCount(), 0)
         self.btnLayout.setContentsMargins(0, 0, 0, 0)
 
-        self.goHomeBtn = Qt.QPushButton('Home')
+        self.goHomeBtn = Qt.QPushButton("Home")
         self.btnLayout.addWidget(self.goHomeBtn, 0, 0)
         self.goHomeBtn.clicked.connect(self.goHomeClicked)
 
-        self.setHomeBtn = Qt.QPushButton('Set Home')
+        self.setHomeBtn = Qt.QPushButton("Set Home")
         self.btnLayout.addWidget(self.setHomeBtn, 0, 1)
         self.setHomeBtn.clicked.connect(self.setHomeClicked)
 
-        self.calibrateBtn = Qt.QPushButton('Calibrate Axes')
+        self.calibrateBtn = Qt.QPushButton("Calibrate Axes")
         self.btnLayout.addWidget(self.calibrateBtn, 0, 2)
         self.calibrateBtn.clicked.connect(self.calibrateClicked)
 
@@ -794,24 +779,24 @@ class StageInterface(Qt.QWidget):
         globalPos = self.dev.globalPosition()
         stagePos = self.dev.getPosition()
         for i in self.posLabels:
-            text = pg.siFormat(globalPos[i], suffix='m', precision=5)
+            text = pg.siFormat(globalPos[i], suffix="m", precision=5)
             self.posLabels[i][0].setText(text)
             self.posLabels[i][1].setText(str(stagePos[i]))
 
     def updateLimits(self):
         limits = self.dev.getLimits()
         cap = self.dev.capabilities()
-        for axis in range(len(cap['limits'])):
-            if not cap['limits'][axis]:
+        for axis in range(len(cap["limits"])):
+            if not cap["limits"][axis]:
                 continue
-            for i,limit in enumerate(limits[axis]):
+            for i, limit in enumerate(limits[axis]):
                 check = self.limitChecks[axis][i]
-                pfx = ('Min:', 'Max:')[i]
+                pfx = ("Min:", "Max:")[i]
                 if limit is None:
                     check.setText(pfx)
                     check.setChecked(False)
                 else:
-                    check.setText(pfx + ' %s' % pg.siFormat(limit, suffix='m'))
+                    check.setText(f'{pfx} {pg.siFormat(limit, suffix="m")}')
                     check.setChecked(True)
 
     def limitCheckClicked(self, b):
