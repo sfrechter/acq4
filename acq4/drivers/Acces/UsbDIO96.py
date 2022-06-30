@@ -17,7 +17,7 @@ from typing import Any, Union, Iterable
 from ... import getManager
 
 # TODO: relay to <jhentges@accesio.com> when this is done
-__all__ = ["UsbDIO96", "AccesError", "INPUT", "OUTPUT"]
+__all__ = ["UsbDIO96", "AccesError"]
 ADCCallbackType = CFUNCTYPE(c_uint32, POINTER(c_uint16), c_uint32, c_uint32, c_uint32)
 DEFAULT_SINGLE_DEVICE_ID = -3
 RETCODE_ERROR_DOCS = \
@@ -26,10 +26,6 @@ RETCODE_ERROR_DOCS = \
 
 class AccesError(Exception):
     pass
-
-
-INPUT = 1
-OUTPUT = 0
 
 
 class UsbDIO96:
@@ -41,12 +37,14 @@ class UsbDIO96:
 
     Usage::
     dev = UsbDIO96()
-    print(f"Connected to DIO96 device with serial number 0x{dev.get_serial_number:x}")
-    dev.configure(OUTPUT, [0, 1, 2])
+    print(f"Connected to DIO96 device with serial number 0x{dev.get_serial_number():x}")
+    dev.configure(UsbDIO96.OUTPUT, [0, 1, 2])
     dev.write(0, 0xff)
     val = dev.read(11)
     """
 
+    INPUT = 1
+    OUTPUT = 0
     _lib_path = None
     _lib = None
 
@@ -90,15 +88,15 @@ class UsbDIO96:
     def get_serial_number(self) -> int:
         sn = c_int64(0)
         self.call("GetDeviceSerialNumber", byref(sn))
-        return sn.value & 0xffffffffffffffff
+        return sn.value & 0xffff_ffff_ffff_ffff
 
     def configure_ports(self, in_or_out: Union[INPUT, OUTPUT], ports: Iterable[int]) -> None:
         """
-        Set the specified ports to either INPUT or OUTPUT mode.
+        Set the specified ports to either INPUT or OUTPUT mode. Note: all ports are INPUT by default.
         """
         for p in ports:
             p_bit = 1 << p
-            if in_or_out == OUTPUT:
+            if in_or_out == UsbDIO96.OUTPUT:
                 self._port_mask[0] |= (p_bit & 0xff)
                 self._port_mask[1] |= ((p_bit >> 8) & 0xf)
                 self._port_io[p] = 0xff
