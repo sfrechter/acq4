@@ -163,7 +163,7 @@ class Sensapex(Stage):
             UMP.get_ump().poller.stop()
         Stage.quit(self)
 
-    def _move(self, pos, speed, linear):
+    def _move(self, pos, speed, linear, **kwargs):
         with self.lock:
             speed = self._interpretSpeed(speed)
             self._lastMove = SensapexMoveFuture(self, pos, speed, self._force_linear_movement or linear)
@@ -179,11 +179,11 @@ class SensapexMoveFuture(MoveFuture):
     def __init__(self, dev, pos, speed, linear):
         MoveFuture.__init__(self, dev, pos, speed)
 
-        # limit the speed so that no move is expected to take less than 200 ms
-        # (otherwise we get big move errors with uMp)
-        minimumMoveTime = 0.2
         distance = np.linalg.norm(self.startPos - self.targetPos)
         if speed > 10e-6:
+            # limit the speed so that no move is expected to take less than 200 ms
+            # (otherwise we get big move errors with uMp)
+            minimumMoveTime = 0.2
             self.speed = min(speed, distance / minimumMoveTime)
 
         self._linear = linear
@@ -197,7 +197,7 @@ class SensapexMoveFuture(MoveFuture):
             return
 
         if self.speed >= 1e-6:
-            assert linear
+            assert linear, f"Linear movement required for all speeds >= 1e-6 ({self.speed:g} requested)"
             self._moveReq = self.dev.dev.goto_pos(pos, self.speed * 1e6, simultaneous=linear, linear=linear)
             self._monitorThread = threading.Thread(target=self._watchForFinish, daemon=True)
         else:
@@ -259,15 +259,13 @@ class SensapexMoveFuture(MoveFuture):
         # interrupted?
         if self._moveReq.interrupted:
             return self._moveReq.interrupt_reason
-        else:
-            # did we reach target?
-            pos = self._moveReq.last_pos
-            dif = np.linalg.norm(np.array(pos) - np.array(self.targetPos))
-            if dif > self.dev.maxMoveError * 1e6:  # require 1um accuracy
-                # missed
-                return "{} stopped before reaching target (start={}, target={}, position={}, dif={}, speed={}).".format(
-                    self.dev.name(), self.startPos, self.targetPos, pos, dif, self.speed
-                )
+        # did we reach target?
+        pos = self._moveReq.last_pos
+        dif = np.linalg.norm(np.array(pos) - np.array(self.targetPos))
+        if dif > self.dev.maxMoveError * 1e6:  # require 1um accuracy
+            # missed
+            return f"{self.dev.name()} stopped before reaching target (start={self.startPos}, " \
+                   f"target={self.targetPos}, position={pos}, dif={dif}, speed={self.speed})."
 
         return None
 
@@ -415,8 +413,7 @@ class SensapexInterface(Qt.QWidget):
         return False
 
     def softstartClicked(self):
-        checked = self.getSoftStartState()
-        if checked:
+        if self.getSoftStartState():
             self.dev.dev.set_soft_start_state(0)
         else:
             self.dev.dev.set_soft_start_state(1)
