@@ -12,6 +12,7 @@ from ctypes import (
     c_int64,
 )
 from ctypes.util import find_library
+from time import sleep
 from typing import Any, Union, Iterable
 
 from ... import getManager
@@ -126,4 +127,27 @@ def handle_config(params):
     UsbDIO96.set_library_path(params.get("usbDio96DriverPath"))
 
 
-handle_config(getManager().config.get("drivers", {}).get("acces", {}))
+if __name__ == "__main__":
+    device_ids = UsbDIO96.get_device_ids()
+    devices = [UsbDIO96(i) for i in device_ids]
+    print(f"{len(devices)} Acces USB DIO96 devices found. Serial numbers:")
+    for d in devices:
+        print(*list(f"{d.get_serial_number():x}"))
+
+    output_ports = [0, 1, 2, 3, 4, 5, 6, 7]
+    for d in devices:
+        d.configure_ports(UsbDIO96.OUTPUT, output_ports)
+        for i in output_ports:
+            d.write(i, 0)
+    sleep(5)
+
+    for d in devices:
+        for i in output_ports:
+            print(f"Turning on port {i} of {d} for 1 second.")
+            d.write(i, 1)
+            sleep(1)
+            d.write(i, 0)
+        d.write(0, 1)
+
+else:
+    handle_config(getManager().config.get("drivers", {}).get("acces", {}))
