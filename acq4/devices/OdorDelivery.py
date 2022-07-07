@@ -37,9 +37,11 @@ class OdorDelivery(Device):
 
 
 class OdorDevGui(Qt.QWidget):
-    # Take the {group_name: {channel: odor_name, ...}, ...} odors and make a ui that:
-    #  * lets user select which group is in right now
-    #  * lets user turn on/off odors
+    """
+    Take the {group_name: {channel: odor_name, ...}, ...} odors and make a ui that:
+     * lets user select which group is in right now
+     * lets user turn on/off odors
+    """
 
     OFF_LABEL = "OFF"
 
@@ -85,12 +87,27 @@ class OdorDevGui(Qt.QWidget):
     def _handleOdorToggle(self, enabled):
         btn = self.sender()
         channel = btn.objectName()
-        self.dev.setAllChannelsOff()
         if channel != self.OFF_LABEL:
             self.dev.setChannelEnabled(channel, enabled)
 
 
 class OdorTaskGui(TaskGui):
+    def __init__(self, dev, taskRunner):
+        super().__init__(dev, taskRunner)
+        raise "TODO"
+
+    def saveState(self):
+        raise "TODO"
+
+    def restoreState(self, state):
+        raise "TODO"
+
+    def generateTask(self, params=None):
+        raise "TODO"
+
+    def listSequence(self):
+        raise "TODO"
+
     # TODO should this also let the user select which group of odors is active? it's not much more.
     # TODO result format?
     # Take currently selected group of odors and give the user the ability to describe a schedule of odor delivery.
@@ -104,9 +121,8 @@ class OdorTask(DeviceTask):
         # TODO set up the DAQ trigger signal
 
     def configure(self):
-        # TODO turn off all channels
-        # if using a trigger line, we can start the listening thread
-        pass
+        self.dev.setAllChannelsOff()
+        # TODO if using a trigger line, we can start the listening thread
 
     def isDone(self):
         pass  # todo
