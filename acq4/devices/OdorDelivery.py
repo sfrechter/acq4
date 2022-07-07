@@ -75,9 +75,9 @@ class OdorDevGui(Qt.QWidget):
             button.toggled.connect(self._handleOdorToggle)
 
     def _handleGroupChange(self, newGroup):
+        self.dev.setAllChannelsOff()
         self.dev.setActiveOdorGroup(newGroup)
         for button in self._odorGroup.buttons():
-            button.setChecked(False)
             self._odorGroup.removeButton(button)
         self._odorLayout.clear()
         self._setupOdorButtons()
