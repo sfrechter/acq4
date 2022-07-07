@@ -20,9 +20,14 @@ class OdorDelivery(Device):
             raise ValueError(f"{newGroup} is not a valid odor group name")
         self.activeOdorGroup = newGroup
 
-    def setChannelEnabled(self, channel, enabled):
+    def setChannelEnabled(self, channel: int, enabled: bool):
         """Turn a given odor channel on or off"""
         raise NotImplementedError()
+
+    def setAllChannelsOff(self):
+        """Turn off all odors. (Reimplement if that can be handled more efficiently than iterating)"""
+        for ch in self.odorChannels():
+            self.setChannelEnabled(ch, False)
 
     def deviceInterface(self, win):
         return OdorDevGui(self)
@@ -36,6 +41,8 @@ class OdorDevGui(Qt.QWidget):
     #  * lets user select which group is in right now
     #  * lets user turn on/off odors
 
+    OFF_LABEL = "OFF"
+
     def __init__(self, dev: OdorDelivery):
         super().__init__()
         self.dev = dev
@@ -47,9 +54,6 @@ class OdorDevGui(Qt.QWidget):
         self._groupSelector.setCurrentText(dev.activeOdorGroup)
         self.layout.addWidget(self._groupSelector, 0, 0)
         self._groupSelector.currentTextChanged.connect(self._handleGroupChange)
-
-        # TODO horizontal spacer?
-
         self._odorLayout = Qt.FlowLayout()
         self._odorGroup = Qt.QButtonGroup()
         self.layout.addLayout(self._odorLayout, 1, 0)
@@ -57,13 +61,18 @@ class OdorDevGui(Qt.QWidget):
 
     def _setupOdorButtons(self):
         odors = self.dev.odorChannels()
+        off_button = Qt.QRadioButton(self.OFF_LABEL)
+        off_button.setObjectName(self.OFF_LABEL)
+        off_button.setChecked(True)
+        self._odorGroup.addButton(off_button)
+        self._odorLayout.addWidget(off_button)
+        off_button.toggled.connect(self._handleOdorToggle)
         for channel, odor in odors.items():
             button = Qt.QRadioButton(f"{channel}: {odor}")
             button.setObjectName(channel)
             self._odorGroup.addButton(button)
             self._odorLayout.addWidget(button)
             button.toggled.connect(self._handleOdorToggle)
-            # TODO which button is enabled by default?
 
     def _handleGroupChange(self, newGroup):
         self.dev.setActiveOdorGroup(newGroup)
@@ -76,11 +85,14 @@ class OdorDevGui(Qt.QWidget):
     def _handleOdorToggle(self, enabled):
         btn = self.sender()
         channel = btn.objectName()
-        self.dev.setChannelEnabled(channel, enabled)
+        self.dev.setAllChannelsOff()
+        if channel != self.OFF_LABEL:
+            self.dev.setChannelEnabled(channel, enabled)
 
 
 class OdorTaskGui(TaskGui):
     # TODO should this also let the user select which group of odors is active? it's not much more.
+    # TODO result format?
     # Take currently selected group of odors and give the user the ability to describe a schedule of odor delivery.
     pass
 
