@@ -1,5 +1,6 @@
 import threading
 
+from pyqtgraph import SpinBox
 from .Device import Device, TaskGui, DeviceTask
 from ..util import Qt
 from ..util.future import Future
@@ -20,14 +21,14 @@ class OdorDelivery(Device):
             raise ValueError(f"{newGroup} is not a valid odor group name")
         self.activeOdorGroup = newGroup
 
-    def setChannelEnabled(self, channel: int, enabled: bool):
+    def setChannelValue(self, channel: int, value: int):
         """Turn a given odor channel on or off"""
         raise NotImplementedError()
 
     def setAllChannelsOff(self):
         """Turn off all odors. (Reimplement if that can be handled more efficiently than iterating)"""
         for ch in self.odorChannels():
-            self.setChannelEnabled(ch, False)
+            self.setChannelValue(ch, 0)
 
     def deviceInterface(self, win):
         return OdorDevGui(self)
@@ -41,6 +42,7 @@ class OdorDevGui(Qt.QWidget):
     Take the {group_name: {channel: odor_name, ...}, ...} odors and make a ui that:
      * lets user select which group is in right now
      * lets user turn on/off odors
+     * lets user set the intensity value
     """
 
     OFF_LABEL = "OFF"
@@ -53,12 +55,15 @@ class OdorDevGui(Qt.QWidget):
         self._groupSelector = Qt.QComboBox()
         for group in dev.odors:
             self._groupSelector.addItem(group)
+        self._intensitySpin = SpinBox(value=1, int=True, step=1, bounds=(0, 2 ** 8 - 1), compactHeight=False)
+        self._intensitySpin.valueChanged.connect(self._handleIntensityChange)
+        self.layout.addWidget(self._intensitySpin, 0, 0)
         self._groupSelector.setCurrentText(dev.activeOdorGroup)
-        self.layout.addWidget(self._groupSelector, 0, 0)
+        self.layout.addWidget(self._groupSelector, 0, 1)
         self._groupSelector.currentTextChanged.connect(self._handleGroupChange)
         self._odorLayout = Qt.FlowLayout()
         self._odorGroup = Qt.QButtonGroup()
-        self.layout.addLayout(self._odorLayout, 1, 0)
+        self.layout.addLayout(self._odorLayout, 1, 0, 1, 2)
         self._setupOdorButtons()
 
     def _setupOdorButtons(self):
@@ -84,11 +89,16 @@ class OdorDevGui(Qt.QWidget):
         self._odorLayout.clear()
         self._setupOdorButtons()
 
+    def _handleIntensityChange(self, newVal):
+        channel = self._odorGroup.checkedButton().objectName()
+        if channel != self.OFF_LABEL:
+            self.dev.setChannelValue(channel, newVal)
+
     def _handleOdorToggle(self, enabled):
         btn = self.sender()
         channel = btn.objectName()
         if channel != self.OFF_LABEL:
-            self.dev.setChannelEnabled(channel, enabled)
+            self.dev.setChannelValue(channel, self._intensitySpin.value() if enabled else 0)
 
 
 class OdorTaskGui(TaskGui):
@@ -110,8 +120,6 @@ class OdorTaskGui(TaskGui):
 
     # TODO should this also let the user select which group of odors is active? it's not much more.
     # TODO result format?
-    # Take currently selected group of odors and give the user the ability to describe a schedule of odor delivery.
-    pass
 
 
 class OdorTask(DeviceTask):

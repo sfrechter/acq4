@@ -6,5 +6,5 @@ class MockOdorDelivery(OdorDelivery):
         super().__init__(deviceManager, config, name)
         self._channelStates = {}
 
-    def setChannelEnabled(self, channel, enabled):
-        pass
+    def setChannelValue(self, channel, value):
+        print(f"setting {channel} to {value}")

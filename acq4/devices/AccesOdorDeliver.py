@@ -9,3 +9,6 @@ class AccesOdorDelivery(OdorDelivery):
         self._dev = UsbDIO96(config.get("deviceId"))
         self._triggerReadChannel = config.get("triggerReadChannel", 11)
         self._daqTriggerChannel = config.get("daqTriggerChannel")  # TODO default? format?
+
+    def setChannelValue(self, channel: int, value: int):
+        self._dev.write(channel, value)
