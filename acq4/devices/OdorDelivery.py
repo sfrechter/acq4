@@ -7,9 +7,11 @@ from ..util.future import Future
 
 
 class OdorDelivery(Device):
+    odors: dict[str, dict[int: str]]  # {group_name: {channel: odor_name, ...}, ...}
+
     def __init__(self, deviceManager, config: dict, name: str):
         super().__init__(deviceManager, config, name)
-        self.odors = config.get("odors", {})  # {group_name: {channel: odor_name, ...}, ...}
+        self.odors = config.get("odors", {})
         self.activeOdorGroup = next(iter(self.odors), None)
         # TODO can/should we read channel state?
 
@@ -26,7 +28,7 @@ class OdorDelivery(Device):
         raise NotImplementedError()
 
     def setAllChannelsOff(self):
-        """Turn off all odors. (Reimplement if that can be handled more efficiently than iterating)"""
+        """Turn off all odors. (Reimplement if that should be handled other than by iterating)"""
         for ch in self.odorChannels():
             self.setChannelValue(ch, 0)
 
