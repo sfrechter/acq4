@@ -18,7 +18,7 @@ from typing import Any, Union, Iterable
 from ... import getManager
 
 # TODO: relay to <jhentges@accesio.com> when this is done
-__all__ = ["UsbDIO96", "AccesError"]
+__all__ = ["UsbDIO96", "AccesError", "DEFAULT_SINGLE_DEVICE_ID"]
 ADCCallbackType = CFUNCTYPE(c_uint32, POINTER(c_uint16), c_uint32, c_uint32, c_uint32)
 DEFAULT_SINGLE_DEVICE_ID = -3
 RETCODE_ERROR_DOCS = \
