@@ -11,7 +11,10 @@ class OdorDelivery(Device):
 
     def __init__(self, deviceManager, config: dict, name: str):
         super().__init__(deviceManager, config, name)
-        self.odors = config.get("odors", {})
+        self.odors = {
+            group: {int(ch): name for ch, name in values.items()}
+            for group, values in config.get("odors", {}).items()
+        }
         self.activeOdorGroup = next(iter(self.odors), None)
         # TODO can/should we read channel state?
 
@@ -79,7 +82,7 @@ class OdorDevGui(Qt.QWidget):
         off_button.toggled.connect(self._handleOdorToggle)
         for channel, odor in odors.items():
             button = Qt.QRadioButton(f"{channel}: {odor}")
-            button.setObjectName(channel)
+            button.setObjectName(str(channel))
             self._odorGroup.addButton(button)
             self._odorLayout.addWidget(button)
             button.toggled.connect(self._handleOdorToggle)
@@ -95,13 +98,13 @@ class OdorDevGui(Qt.QWidget):
     def _handleIntensityChange(self, newVal):
         channel = self._odorGroup.checkedButton().objectName()
         if channel != self.OFF_LABEL:
-            self.dev.setChannelValue(channel, newVal)
+            self.dev.setChannelValue(int(channel), newVal)
 
     def _handleOdorToggle(self, enabled):
         btn = self.sender()
         channel = btn.objectName()
         if channel != self.OFF_LABEL:
-            self.dev.setChannelValue(channel, self._intensitySpin.value() if enabled else 0)
+            self.dev.setChannelValue(int(channel), self._intensitySpin.value() if enabled else 0)
 
 
 class OdorTaskGui(TaskGui):
