@@ -36,7 +36,8 @@ class OdorDelivery(Device):
         return OdorDevGui(self)
 
     def taskInterface(self, task):
-        return OdorTaskGui(self, task)
+        return None
+        # return OdorTaskGui(self, task)
 
 
 class OdorDevGui(Qt.QWidget):
@@ -121,7 +122,7 @@ class OdorTaskGui(TaskGui):
         raise "TODO"
 
     # TODO should this also let the user select which group of odors is active? it's not much more.
-    # TODO result format?
+    # TODO "result" format? ndarray with vals at expected time points?
 
 
 class OdorTask(DeviceTask):
