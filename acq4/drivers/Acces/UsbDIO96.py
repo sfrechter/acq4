@@ -66,7 +66,10 @@ class UsbDIO96:
     @classmethod
     def get_device_ids(cls) -> list[int]:
         bitmask = cls.get_library().GetDevices()
-        return [i for i in range(32) if (1 << i) & bitmask]
+        ids = [i for i in range(32) if (1 << i) & bitmask]
+        if len(ids) == 1:
+            return [DEFAULT_SINGLE_DEVICE_ID]
+        return ids
 
     def __init__(self, dev_id: int = DEFAULT_SINGLE_DEVICE_ID) -> None:
         self._id = dev_id
@@ -76,7 +79,7 @@ class UsbDIO96:
     def __str__(self) -> str:
         return f"<UsbDIO96 device {self._id}>"
 
-    def call(self, fn_name: str, *args) -> Any:
+    def call(self, fn_name: str, *args) -> None:
         fn = getattr(self._lib, fn_name)
         status = fn(self._id, *args)
         if status != 0:
@@ -84,7 +87,6 @@ class UsbDIO96:
                 f"Acces function call '{fn_name}({args})' returned error code {status}. See {RETCODE_ERROR_DOCS}"
                 f" for details."
             )
-        return None
 
     def get_serial_number(self) -> int:
         sn = c_int64(0)
