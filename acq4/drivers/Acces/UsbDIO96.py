@@ -66,7 +66,10 @@ class UsbDIO96:
     @classmethod
     def get_device_ids(cls) -> list[int]:
         bitmask = cls.get_library().GetDevices()
-        return [i for i in range(32) if (1 << i) & bitmask]
+        ids = [i for i in range(32) if (1 << i) & bitmask]
+        if len(ids) == 1:
+            return [DEFAULT_SINGLE_DEVICE_ID]
+        return ids
 
     def __init__(self, dev_id: int = DEFAULT_SINGLE_DEVICE_ID) -> None:
         self._id = dev_id
