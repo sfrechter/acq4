@@ -78,13 +78,13 @@ class UsbDIO96:
 
     def call(self, fn_name: str, *args) -> Any:
         fn = getattr(self._lib, fn_name)
-        status, *etc = fn(self._id, *args)
+        status = fn(self._id, *args)
         if status != 0:
             raise AccesError(
                 f"Acces function call '{fn_name}({args})' returned error code {status}. See {RETCODE_ERROR_DOCS}"
                 f" for details."
             )
-        return etc
+        return None
 
     def get_serial_number(self) -> int:
         sn = c_int64(0)
