@@ -23,14 +23,14 @@ class OdorDelivery(Device):
     def odorChannels(self):
         return sorted([gr["channel"] for gr in self.odors.values()])
 
-    def setChannelPortEnabled(self, channel: int, port: int, enabled: bool):
-        """Turn a given odor channel/port on or off"""
+    def setChannelValue(self, channel: int, value: int):
+        """Turn a given odor channel value"""
         raise NotImplementedError()
 
     def setAllChannelsOff(self):
         """Turn off all odors. (Reimplement if that should be handled other than by iterating)"""
         for ch in self.odorChannels():
-            self.setChannelPortEnabled(ch, 1, False)
+            self.setChannelValue(ch, 0)
 
     def deviceInterface(self, win):
         return OdorDevGui(self)
@@ -59,6 +59,7 @@ class OdorDevGui(Qt.QWidget):
         self.layout = Qt.FlowLayout()
         self.setLayout(self.layout)
         self._buttonGroups = {}
+        self._controlButtons = {}
         self._setupOdorButtons()
 
     def _setupOdorButtons(self):
@@ -72,24 +73,42 @@ class OdorDevGui(Qt.QWidget):
             group_layout = Qt.FlowLayout()
             group_box.setLayout(group_layout)
             self.layout.addWidget(group_box)
+            button_group = Qt.QButtonGroup()
+            self._buttonGroups[group_name] = button_group
+
+            control_button = Qt.QRadioButton(f"{channel}[1]: Control")
+            control_button.setObjectName(f"{channel}:1")
+            control_button.setChecked(True)
+            group_layout.addWidget(control_button)
+            button_group.addButton(control_button)
+            control_button.clicked.connect(self._handleOdorButtonPush)
+            self._controlButtons[group_name] = control_button
 
             for port, odor in group_config["ports"].items():
-                button = Qt.QCheckBox(f"{channel}[{port}]: {odor}")
+                button = Qt.QRadioButton(f"{channel}[{port}]: {odor}")
                 button.setObjectName(f"{channel}:{port}")
                 group_layout.addWidget(button)
+                button_group.addButton(button)
                 button.clicked.connect(self._handleOdorButtonPush)
 
     def _handleOffButtonPush(self, enabled):
         btn = self.sender()
         group_name = btn.objectName()
         channel = self.dev.odors[group_name]["channel"]
-        self.dev.setChannelPortEnabled(channel, 1, enabled)
-        # TODO maybe also uncheck all buttons?
+        self.dev.setChannelValue(channel, 1 if enabled else 0)
+        if enabled:
+            for button in self._buttonGroups[group_name].buttons():
+                if button.isChecked():
+                    channel, port = map(int, button.objectName().split(":"))
+                    if port != 1:
+                        self.dev.setChannelValue(channel, port)
+        else:
+            self._controlButtons[group_name].setChecked(True)
 
-    def _handleOdorButtonPush(self, enabled):
+    def _handleOdorButtonPush(self):
         btn = self.sender()
         channel, port = map(int, btn.objectName().split(":"))
-        self.dev.setChannelPortEnabled(channel, port, enabled)
+        self.dev.setChannelValue(channel, port)
 
 
 class OdorTaskGui(TaskGui):

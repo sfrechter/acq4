@@ -11,11 +11,8 @@ class AccesOdorDelivery(OdorDelivery):
         self._dev = UsbDIO96(config.get("deviceId", DEFAULT_SINGLE_DEVICE_ID))
         output_ports = {ch for group in self.odors.values() for ch in group}
         self._dev.configure_ports(UsbDIO96.OUTPUT, output_ports)
-        self._port_states = {}
         self._triggerReadChannel = config.get("triggerReadChannel", 11)
         self._daqTriggerChannel = config.get("daqTriggerChannel")  # TODO default? format?
 
-    def setChannelPortEnabled(self, channel: int, port: int, enabled: bool):
-        # TODO special handling of port 1?
-        self._port_states.setdefault(channel, {})[port] = enabled
-        self._dev.write(channel, sum(self._port_states[channel].values()))
+    def setChannelValue(self, channel: int, value: int):
+        self._dev.write(channel, value)
