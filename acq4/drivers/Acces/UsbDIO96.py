@@ -104,7 +104,7 @@ class UsbDIO96:
             if in_or_out == UsbDIO96.OUTPUT:
                 self._port_mask[0] |= (p_bit & 0xff)
                 self._port_mask[1] |= ((p_bit >> 8) & 0xf)
-                self._port_io[p] = 0xff
+                self._port_io[p] = 0x01
             else:
                 self._port_mask[0] &= (~p_bit & 0xff)
                 self._port_mask[1] &= ((~p_bit >> 8) & 0xf)
