@@ -13,7 +13,7 @@ from ctypes import (
 )
 from ctypes.util import find_library
 from time import sleep
-from typing import Any, Union, Iterable
+from typing import Union, Iterable
 
 from ... import getManager
 
@@ -134,7 +134,7 @@ def handle_config(params):
 if __name__ == "__main__":
     device_ids = UsbDIO96.get_device_ids()
     devices = [UsbDIO96(i) for i in device_ids]
-    print(f"{len(devices)} Acces USB DIO96 device{'s' if len(devices) != 1} found. Serial numbers:")
+    print(f"{len(devices)} Acces USB DIO96 device{'s' if len(devices) != 1 else ''} found. Serial numbers:")
     for d in devices:
         print(*list(f"{d.get_serial_number():x}"))
 
