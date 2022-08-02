@@ -75,7 +75,7 @@ class UsbDIO96:
         if self._lib is None:
             self.get_library()
         self._id = dev_id
-        self._port_mask = (c_ubyte * 2)(0)  # bit mask of which ports are configured as OUTPUT
+        self._chan_mask = (c_ubyte * 2)(0)  # bit mask of which ports are configured as OUTPUT
         self._port_io = (c_ubyte * 12)(0)  # data written to the ports whenever they're configured as OUTPUT
 
     def __str__(self) -> str:
@@ -95,22 +95,23 @@ class UsbDIO96:
         self.call("GetDeviceSerialNumber", byref(sn))
         return sn.value & 0xffff_ffff_ffff_ffff
 
-    def configure_ports(self, in_or_out: Union[INPUT, OUTPUT], ports: Iterable[int]) -> None:
+    def configure_channels(self, in_or_out: Union[INPUT, OUTPUT], channels: Iterable[int]) -> None:
         """
-        Set the specified ports to either INPUT or OUTPUT mode. Note: all ports are INPUT by default.
+        Set the specified channels to either INPUT or OUTPUT mode. Note: all channels are INPUT by default. An initial
+        value of 0x01 will be written when in OUTPUT mode.
         """
-        for p in ports:
-            p_bit = 1 << p
+        for ch in channels:
+            ch_bit = 1 << ch
             if in_or_out == UsbDIO96.OUTPUT:
-                self._port_mask[0] |= (p_bit & 0xff)
-                self._port_mask[1] |= ((p_bit >> 8) & 0xf)
-                self._port_io[p] = 0x01
+                self._chan_mask[0] |= (ch_bit & 0xff)
+                self._chan_mask[1] |= ((ch_bit >> 8) & 0xf)
+                self._port_io[ch] = 0x01
             else:
-                self._port_mask[0] &= (~p_bit & 0xff)
-                self._port_mask[1] &= ((~p_bit >> 8) & 0xf)
-                self._port_io[p] = 0x00
+                self._chan_mask[0] &= (~ch_bit & 0xff)
+                self._chan_mask[1] &= ((~ch_bit >> 8) & 0xf)
+                self._port_io[ch] = 0x00
 
-        self.call("DIO_Configure", True, self._port_mask, self._port_io)
+        self.call("DIO_Configure", True, self._chan_mask, self._port_io)
 
     def write(self, port: int, data: int):
         """
@@ -140,7 +141,7 @@ if __name__ == "__main__":
 
     output_ports = [0, 1, 2, 3, 4, 5, 6, 7]
     for d in devices:
-        d.configure_ports(UsbDIO96.OUTPUT, output_ports)
+        d.configure_channels(UsbDIO96.OUTPUT, output_ports)
         for i in output_ports:
             d.write(i, 0)
     sleep(5)
