@@ -8,7 +8,7 @@ from ..util.future import Future
 
 class OdorDelivery(Device):
     # {channel_name: {channel: number, ports: {port_number: odor_name, ...}}, ...}
-    odors: "dict[str, dict[str : Union[int, dict[int:str]]]]"
+    odors: "dict[str, dict[str, Union[int, dict[int, str]]]]"
 
     def __init__(self, deviceManager, config: dict, name: str):
         super().__init__(deviceManager, config, name)
