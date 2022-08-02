@@ -72,6 +72,8 @@ class UsbDIO96:
         return ids
 
     def __init__(self, dev_id: int = DEFAULT_SINGLE_DEVICE_ID) -> None:
+        if self._lib is None:
+            self.get_library()
         self._id = dev_id
         self._port_mask = (c_ubyte * 2)(0)  # bit mask of which ports are configured as OUTPUT
         self._port_io = (c_ubyte * 12)(0)  # data written to the ports whenever they're configured as OUTPUT
@@ -132,7 +134,7 @@ def handle_config(params):
 if __name__ == "__main__":
     device_ids = UsbDIO96.get_device_ids()
     devices = [UsbDIO96(i) for i in device_ids]
-    print(f"{len(devices)} Acces USB DIO96 devices found. Serial numbers:")
+    print(f"{len(devices)} Acces USB DIO96 device{'s' if len(devices) != 1} found. Serial numbers:")
     for d in devices:
         print(*list(f"{d.get_serial_number():x}"))
 
