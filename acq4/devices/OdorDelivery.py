@@ -164,10 +164,7 @@ class OdorTaskGui(TaskGui):
     def _redrawPlot(self):
         self._plot.clear()
         chan_names = {conf["channel"]: chan for chan, conf in self.dev.odors.items()}
-        # TODO legend
         self._plot.addLegend()
-        # TODO color
-        # TODO activation value
         if self._events:
             chans_in_use = {ev["Odor"][0] for ev in self._events}
 
@@ -196,7 +193,7 @@ class OdorTaskGui(TaskGui):
                 arrays[chan][start:end] |= val
             time_vals = np.linspace(0, task_duration, point_count)
             for chan, arr in arrays.items():
-                self._plot.plot(time_vals, arr, pen=mkPen(color=intColor(chan, max(arrays) + 1)))
+                self._plot.plot(time_vals, arr, name=chan_names[chan], pen=mkPen(color=intColor(chan, max(arrays) + 1)))
 
     def saveState(self):
         raise "TODO"
