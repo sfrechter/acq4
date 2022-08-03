@@ -3,7 +3,7 @@ import threading
 from typing import Union
 
 import numpy as np
-from pyqtgraph import PlotWidget
+from pyqtgraph import PlotWidget, intColor, mkPen
 from pyqtgraph.parametertree import ParameterTree
 from pyqtgraph.parametertree.parameterTypes import GroupParameter
 from .Device import Device, TaskGui, DeviceTask
@@ -142,19 +142,21 @@ class OdorTaskGui(TaskGui):
         # TODO mutex _events?
         ev = GroupParameter(name=f"Event {len(self._events)}")
         # TODO limits, units, default values
-        ev.addChildren([
-            dict(name="Start Time", type="float"),
-            dict(name="Duration", type="float"),
-            dict(
-                name="Odor",
-                type="list",
-                limits={
-                    name: (chanOpts["channel"], port)
-                    for name, chanOpts in self.dev.odors.items()
-                    for port, name in chanOpts["ports"].items()
-                },
-            ),
-        ])
+        ev.addChildren(
+            [
+                dict(name="Start Time", type="float"),
+                dict(name="Duration", type="float"),
+                dict(
+                    name="Odor",
+                    type="list",
+                    limits={
+                        name: (chanOpts["channel"], port)
+                        for name, chanOpts in self.dev.odors.items()
+                        for port, name in chanOpts["ports"].items()
+                    },
+                ),
+            ]
+        )
 
         ev = self._params.addChild(ev)
         self._events.append(ev)
@@ -173,23 +175,28 @@ class OdorTaskGui(TaskGui):
                 if a == 0:
                     return 0
                 return int(math.log10(float(str(a)[::-1]))) + 1
+
             precision = max(get_precision(ev["Duration"]) for ev in self._events)
             precision = max([precision, max(get_precision(ev["Start Time"]) for ev in self._events)])
             MIN_PRECISION = 3
             MAX_PRECISION = 10
             precision = max([MIN_PRECISION, min([MAX_PRECISION, precision])])
-            total_duration = self.taskRunner.getParam("duration")
-            total_points = int(total_duration * (10 ** precision)) + 1
-            time_vals = np.linspace(0, total_duration, total_points)
-            arrays = {ev["Odor"][0]: np.zeros((total_points,), dtype="int") for ev in self._events}
+            task_duration = self.taskRunner.getParam("duration")
+            point_count = int(task_duration * (10 ** precision)) + 1
+            arrays = {
+                chan: (np.ones(point_count, dtype=int) if chan in chans_in_use else np.zeros(point_count, dtype=int))
+                for chan in chan_names
+            }
             for ev in self._events:
                 start = int(ev["Start Time"] * (10 ** precision))
                 length = int(ev["Duration"] * (10 ** precision))
                 chan, val = ev["Odor"]
-                end = min((start + length, total_points))
+                end = min((start + length, point_count))
+                arrays[chan][start:end] &= 0xFE  # turn off control (1) for the duration
                 arrays[chan][start:end] |= val
-            for arr in arrays.values():
-                self._plot.plot(time_vals, arr)
+            time_vals = np.linspace(0, task_duration, point_count)
+            for chan, arr in arrays.items():
+                self._plot.plot(time_vals, arr, pen=mkPen(color=intColor(chan, max(arrays) + 1)))
 
     def saveState(self):
         raise "TODO"
