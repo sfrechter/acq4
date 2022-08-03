@@ -1,6 +1,9 @@
+import math
 import threading
 from typing import Union
 
+import numpy as np
+from pyqtgraph import PlotWidget
 from pyqtgraph.parametertree import ParameterTree
 from pyqtgraph.parametertree.parameterTypes import GroupParameter
 from .Device import Device, TaskGui, DeviceTask
@@ -115,20 +118,32 @@ class OdorDevGui(Qt.QWidget):
 class OdorTaskGui(TaskGui):
     def __init__(self, dev: OdorDelivery, taskRunner):
         super().__init__(dev, taskRunner)
+        self._events = []
+        self.taskRunner.sigTaskChanged.connect(self._redrawPlot)
         self._layout = Qt.QGridLayout()
         self.setLayout(self._layout)
-        self._pt = ParameterTree()
+
+        self._plot = PlotWidget()
+        self._layout.addWidget(self._plot, 0, 1)
+
         self._params = GroupParameter(name="Odor Events", addText="Add Odor Event")
-        self._events = []
+        self._params.sigTreeStateChanged.connect(self._redrawPlot)
         self._params.sigAddNew.connect(self._addNewOdorEvent)
-        self._pt.addParameters(self._params)
-        self._layout.addWidget(self._pt, 0, 0)
+        ptree = ParameterTree()
+        ptree.addParameters(self._params)
+        self._layout.addWidget(ptree, 0, 0)
+        # TODO priming instructions?
+        # TODO validate if odors are happening simultaneously
+        # TODO validate if the events will go longer than the total task runner
+        # TODO ui for removing odor events
+        # TODO ui for sequences of odor events (by channel? just a select-y list?)
 
     def _addNewOdorEvent(self):  # ignore args: self, typ
         # TODO mutex _events?
         ev = GroupParameter(name=f"Event {len(self._events)}")
+        # TODO limits, units, default values
         ev.addChildren([
-            dict(name="Start time", type="float"),
+            dict(name="Start Time", type="float"),
             dict(name="Duration", type="float"),
             dict(
                 name="Odor",
@@ -144,6 +159,38 @@ class OdorTaskGui(TaskGui):
         ev = self._params.addChild(ev)
         self._events.append(ev)
 
+    def _redrawPlot(self):
+        self._plot.clear()
+        chan_names = {conf["channel"]: chan for chan, conf in self.dev.odors.items()}
+        # TODO legend
+        self._plot.addLegend()
+        # TODO color
+        # TODO activation value
+        if self._events:
+            chans_in_use = {ev["Odor"][0] for ev in self._events}
+
+            def get_precision(a):
+                if a == 0:
+                    return 0
+                return int(math.log10(float(str(a)[::-1]))) + 1
+            precision = max(get_precision(ev["Duration"]) for ev in self._events)
+            precision = max([precision, max(get_precision(ev["Start Time"]) for ev in self._events)])
+            MIN_PRECISION = 3
+            MAX_PRECISION = 10
+            precision = max([MIN_PRECISION, min([MAX_PRECISION, precision])])
+            total_duration = self.taskRunner.getParam("duration")
+            total_points = int(total_duration * (10 ** precision)) + 1
+            time_vals = np.linspace(0, total_duration, total_points)
+            arrays = {ev["Odor"][0]: np.zeros((total_points,), dtype="int") for ev in self._events}
+            for ev in self._events:
+                start = int(ev["Start Time"] * (10 ** precision))
+                length = int(ev["Duration"] * (10 ** precision))
+                chan, val = ev["Odor"]
+                end = min((start + length, total_points))
+                arrays[chan][start:end] |= val
+            for arr in arrays.values():
+                self._plot.plot(time_vals, arr)
+
     def saveState(self):
         raise "TODO"
 
@@ -153,18 +200,31 @@ class OdorTaskGui(TaskGui):
     def generateTask(self, params=None):
         if params is None:
             params = {}
-        # params=None means we're not in a sequence
-        # otherwise, we'll get a dict with a key: list that came from the listSequence combos
+        for ev in self._events:
+            params.setdefault(f"{ev.name()} Start Time", ev["Start Time"])
+            params.setdefault(f"{ev.name()} Duration", ev["Duration"])
+            params.setdefault(f"{ev.name()} Odor", ev["Odor"])
         return params
 
     def listSequence(self):
+        params = {}
         # for if this task is being combinatorially expanded. output eventually gets sent to generateTask
-        return {}
+        for ev in self._events:
+            if ev["Start Time"] is None:
+                params[f"{ev.name()} Start Time"] = []
+            if ev["Duration"] is None:
+                params[f"{ev.name()} Duration"] = []
+            if ev["Odor"] is None:
+                params[f"{ev.name()} Odor"] = []
+        return params
 
 
 class OdorTask(DeviceTask):
-    def __init__(self, dev, cmd, parentTask):
-        """cmd structure: """
+    def __init__(self, dev: OdorDelivery, cmd: dict, parentTask):
+        """
+        cmd: dict
+            Structure: {"Event 0 Start Time": start_in_s, "Event 0 Duration": dur_in_s, "Event 0 Odor": (chan, port)}
+        """
         super().__init__(dev, cmd, parentTask)
         self._cmd = cmd
         self.dev.setAllChannelsOff()
