@@ -144,13 +144,13 @@ class OdorTaskGui(TaskGui):
         # TODO limits, units, default values
         ev.addChildren(
             [
-                dict(name="Start Time", type="float"),
-                dict(name="Duration", type="float"),
+                dict(name="Start Time", type="float", limits=(0, None), units="s", siPrefix=True),
+                dict(name="Duration", type="float", limits=(0, None), units="s", siPrefix=True, value=0.1),
                 dict(
                     name="Odor",
                     type="list",
                     limits={
-                        name: (chanOpts["channel"], port)
+                        f"{chanOpts['channel']}[{port}]: {name}": (chanOpts["channel"], port)
                         for name, chanOpts in self.dev.odors.items()
                         for port, name in chanOpts["ports"].items()
                     },
@@ -160,6 +160,7 @@ class OdorTaskGui(TaskGui):
 
         ev = self._params.addChild(ev)
         self._events.append(ev)
+        self._redrawPlot()
 
     def _redrawPlot(self):
         self._plot.clear()
