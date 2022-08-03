@@ -1,6 +1,8 @@
 import threading
 from typing import Union
 
+from pyqtgraph.parametertree import ParameterTree
+from pyqtgraph.parametertree.parameterTypes import GroupParameter
 from .Device import Device, TaskGui, DeviceTask
 from ..util import Qt
 from ..util.future import Future
@@ -36,8 +38,7 @@ class OdorDelivery(Device):
         return OdorDevGui(self)
 
     def taskInterface(self, task):
-        return None
-        # return OdorTaskGui(self, task)
+        return OdorTaskGui(self, task)
 
     def createTask(self, cmd, parentTask):
         return OdorTask(self, cmd, parentTask)
@@ -112,9 +113,36 @@ class OdorDevGui(Qt.QWidget):
 
 
 class OdorTaskGui(TaskGui):
-    def __init__(self, dev, taskRunner):
+    def __init__(self, dev: OdorDelivery, taskRunner):
         super().__init__(dev, taskRunner)
-        raise "TODO"
+        self._layout = Qt.QGridLayout()
+        self.setLayout(self._layout)
+        self._pt = ParameterTree()
+        self._params = GroupParameter(name="Odor Events", addText="Add Odor Event")
+        self._events = []
+        self._params.sigAddNew.connect(self._addNewOdorEvent)
+        self._pt.addParameters(self._params)
+        self._layout.addWidget(self._pt, 0, 0)
+
+    def _addNewOdorEvent(self):  # ignore args: self, typ
+        # TODO mutex _events?
+        ev = GroupParameter(name=f"Event {len(self._events)}")
+        ev.addChildren([
+            dict(name="Start time", type="float"),
+            dict(name="Duration", type="float"),
+            dict(
+                name="Odor",
+                type="list",
+                limits={
+                    name: (chanOpts["channel"], port)
+                    for name, chanOpts in self.dev.odors.items()
+                    for port, name in chanOpts["ports"].items()
+                },
+            ),
+        ])
+
+        ev = self._params.addChild(ev)
+        self._events.append(ev)
 
     def saveState(self):
         raise "TODO"
@@ -123,16 +151,15 @@ class OdorTaskGui(TaskGui):
         raise "TODO"
 
     def generateTask(self, params=None):
-        # params=None means "single"
-        # otherwise, we'll get a dict with a key: list
-        raise "TODO"
+        if params is None:
+            params = {}
+        # params=None means we're not in a sequence
+        # otherwise, we'll get a dict with a key: list that came from the listSequence combos
+        return params
 
     def listSequence(self):
-        # for if this task is being combinatorially expanded
-        raise "TODO"
-
-    # TODO should this also let the user select which group of odors is active? it's not much more.
-    # TODO "result" format? ndarray with vals at expected time points?
+        # for if this task is being combinatorially expanded. output eventually gets sent to generateTask
+        return {}
 
 
 class OdorTask(DeviceTask):
