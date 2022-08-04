@@ -1,5 +1,7 @@
 import math
 import threading
+from datetime import datetime
+from time import sleep
 from typing import Union
 
 import numpy as np
@@ -119,6 +121,7 @@ class OdorTaskGui(TaskGui):
     def __init__(self, dev: OdorDelivery, taskRunner):
         super().__init__(dev, taskRunner)
         self._events = []
+        self._next_event_number = 0
         self.taskRunner.sigTaskChanged.connect(self._redrawPlot)
         self._layout = Qt.QGridLayout()
         self.setLayout(self._layout)
@@ -139,9 +142,8 @@ class OdorTaskGui(TaskGui):
         # TODO ui for sequences of odor events (by channel? just a select-y list?)
 
     def _addNewOdorEvent(self):  # ignore args: self, typ
-        # TODO mutex _events?
-        ev = GroupParameter(name=f"Event {len(self._events)}")
-        # TODO limits, units, default values
+        ev = GroupParameter(name=f"Event {self._next_event_number}")
+        self._next_event_number += 1
         ev.addChildren(
             [
                 dict(name="Start Time", type="float", limits=(0, None), units="s", siPrefix=True),
@@ -214,6 +216,7 @@ class OdorTaskGui(TaskGui):
     def listSequence(self):
         params = {}
         # for if this task is being combinatorially expanded. output eventually gets sent to generateTask
+        # TODO
         for ev in self._events:
             if ev["Start Time"] is None:
                 params[f"{ev.name()} Start Time"] = []
@@ -232,8 +235,18 @@ class OdorTask(DeviceTask):
         """
         super().__init__(dev, cmd, parentTask)
         self._cmd = cmd
+        self._events = {}
+        for key, val in cmd.items():
+            _, ev_num, *opt_name = key.split(" ")
+            opt_name = " ".join(opt_name)
+            self._events.setdefault(ev_num, {})[opt_name] = val
+        self._events = self._events.values()  # the number is just to group the opts
         self.dev.setAllChannelsOff()
-        # TODO turn on control bit for all relevant channels
+        self._future = None
+        self._result = None
+        chans_in_use = {opts["Odor"][0] for opts in self._events}
+        for chan in chans_in_use:
+            self.dev.setChannelValue(chan, 1)
         # TODO set up the DAQ trigger signal
 
     def configure(self):
@@ -241,16 +254,18 @@ class OdorTask(DeviceTask):
         pass
 
     def isDone(self):
-        pass  # todo
+        return self._future is not None and self._future.isDone()
 
     def getResult(self):
-        raise "TODO"  # save the cmd
+        # TODO format? ndarray with vals at expected time points, or just the config?
+        return self._events
 
     def start(self):
-        pass  # TODO
+        self._future = OdorFuture(self.dev, self._events)
 
     def stop(self, **kwargs):
-        pass  # TODO
+        if self._future is not None:
+            self._future.stop(reason=kwargs.get("reason"))
 
 
 class OdorFuture(Future):
@@ -258,6 +273,7 @@ class OdorFuture(Future):
         super().__init__()
         self._dev = dev
         self._schedule = schedule
+        self._duration = max(ev["Start Time"] + ev["Duration"] for ev in schedule)
         self._thread = threading.Thread(target=self._executeSchedule)
         self._thread.start()
 
@@ -267,9 +283,36 @@ class OdorFuture(Future):
         return 0  # TODO
 
     def _executeSchedule(self):
+        start = datetime.now()
+        chan_values = {}
+        while True:
+            # TODO wait for signal
+            sleep(0.01)
+            now = (datetime.now() - start).total_seconds()
+            if now > self._duration:
+                for chan in chan_values:
+                    self._dev.setChannelValue(chan, 1)
+                break
+            for event in self._schedule:
+                chan, port = event["Odor"]
+                if chan not in chan_values:
+                    chan_values[chan] = 1
+                end_time = event["Start Time"] + event["Duration"]
+                if now >= end_time:
+                    if chan_values[chan] & port == 1:
+                        chan_values[chan] ^= port
+                        if chan_values[chan] == 0:
+                            chan_values[chan] = 1
+                        self._dev.setChannelValue(chan, chan_values[chan])
+                elif now >= event["Start Time"]:
+                    if chan_values[chan] & port == 0:
+                        chan_values[chan] &= 0xFE  # Turn off control
+                        chan_values[chan] |= port
+                        self._dev.setChannelValue(chan, chan_values[chan])
+
+        self._isDone = True
         # optionally wait for trigger
         # for each element ((channel, value), ...), duration) of the schedule:
         #     reset channels to 0, maybe?
         #     set new channel values
         #     wait until duration has passed
-        pass  # TODO
