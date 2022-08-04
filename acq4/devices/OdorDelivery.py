@@ -1,6 +1,13 @@
+import math
 import threading
+from datetime import datetime
+from time import sleep
 from typing import Union
 
+import numpy as np
+from pyqtgraph import PlotWidget, intColor, mkPen
+from pyqtgraph.parametertree import ParameterTree
+from pyqtgraph.parametertree.parameterTypes import GroupParameter
 from .Device import Device, TaskGui, DeviceTask
 from ..util import Qt
 from ..util.future import Future
@@ -8,7 +15,7 @@ from ..util.future import Future
 
 class OdorDelivery(Device):
     # {channel_name: {channel: number, ports: {port_number: odor_name, ...}}, ...}
-    odors: "dict[str, dict[str : Union[int, dict[int:str]]]]"
+    odors: "dict[str, dict[str, Union[int, dict[int, str]]]]"
 
     def __init__(self, deviceManager, config: dict, name: str):
         super().__init__(deviceManager, config, name)
@@ -36,8 +43,7 @@ class OdorDelivery(Device):
         return OdorDevGui(self)
 
     def taskInterface(self, task):
-        return None
-        # return OdorTaskGui(self, task)
+        return OdorTaskGui(self, task)
 
     def createTask(self, cmd, parentTask):
         return OdorTask(self, cmd, parentTask)
@@ -112,9 +118,85 @@ class OdorDevGui(Qt.QWidget):
 
 
 class OdorTaskGui(TaskGui):
-    def __init__(self, dev, taskRunner):
+    def __init__(self, dev: OdorDelivery, taskRunner):
         super().__init__(dev, taskRunner)
-        raise "TODO"
+        self._events = []
+        self._next_event_number = 0
+        self.taskRunner.sigTaskChanged.connect(self._redrawPlot)
+        self._layout = Qt.QGridLayout()
+        self.setLayout(self._layout)
+
+        self._plot = PlotWidget()
+        self._layout.addWidget(self._plot, 0, 1)
+
+        self._params = GroupParameter(name="Odor Events", addText="Add Odor Event")
+        self._params.sigTreeStateChanged.connect(self._redrawPlot)
+        self._params.sigAddNew.connect(self._addNewOdorEvent)
+        ptree = ParameterTree()
+        ptree.addParameters(self._params)
+        self._layout.addWidget(ptree, 0, 0)
+        # TODO priming instructions?
+        # TODO validate if odors are happening simultaneously
+        # TODO validate if the events will go longer than the total task runner
+        # TODO ui for removing odor events
+        # TODO ui for sequences of odor events (by channel? just a select-y list?)
+
+    def _addNewOdorEvent(self):  # ignore args: self, typ
+        ev = GroupParameter(name=f"Event {self._next_event_number}")
+        self._next_event_number += 1
+        ev.addChildren(
+            [
+                dict(name="Start Time", type="float", limits=(0, None), units="s", siPrefix=True),
+                dict(name="Duration", type="float", limits=(0, None), units="s", siPrefix=True, value=0.1),
+                dict(
+                    name="Odor",
+                    type="list",
+                    limits={
+                        f"{chanOpts['channel']}[{port}]: {name}": (chanOpts["channel"], port)
+                        for name, chanOpts in self.dev.odors.items()
+                        for port, name in chanOpts["ports"].items()
+                    },
+                ),
+            ]
+        )
+
+        ev = self._params.addChild(ev)
+        self._events.append(ev)
+        self._redrawPlot()
+
+    def _redrawPlot(self):
+        self._plot.clear()
+        chan_names = {conf["channel"]: chan for chan, conf in self.dev.odors.items()}
+        self._plot.addLegend()
+        if self._events:
+            chans_in_use = {ev["Odor"][0] for ev in self._events}
+
+            def get_precision(a):
+                if a == 0:
+                    return 0
+                return int(math.log10(float(str(a)[::-1]))) + 1
+
+            precision = max(get_precision(ev["Duration"]) for ev in self._events)
+            precision = max([precision, max(get_precision(ev["Start Time"]) for ev in self._events)])
+            MIN_PRECISION = 3
+            MAX_PRECISION = 10
+            precision = max([MIN_PRECISION, min([MAX_PRECISION, precision])])
+            task_duration = self.taskRunner.getParam("duration")
+            point_count = int(task_duration * (10 ** precision)) + 1
+            arrays = {
+                chan: (np.ones(point_count, dtype=int) if chan in chans_in_use else np.zeros(point_count, dtype=int))
+                for chan in chan_names
+            }
+            for ev in self._events:
+                start = int(ev["Start Time"] * (10 ** precision))
+                length = int(ev["Duration"] * (10 ** precision))
+                chan, val = ev["Odor"]
+                end = min((start + length, point_count))
+                arrays[chan][start:end] &= 0xFE  # turn off control (1) for the duration
+                arrays[chan][start:end] |= val
+            time_vals = np.linspace(0, task_duration, point_count)
+            for chan, arr in arrays.items():
+                self._plot.plot(time_vals, arr, name=chan_names[chan], pen=mkPen(color=intColor(chan, max(arrays) + 1)))
 
     def saveState(self):
         raise "TODO"
@@ -123,25 +205,48 @@ class OdorTaskGui(TaskGui):
         raise "TODO"
 
     def generateTask(self, params=None):
-        # params=None means "single"
-        # otherwise, we'll get a dict with a key: list
-        raise "TODO"
+        if params is None:
+            params = {}
+        for ev in self._events:
+            params.setdefault(f"{ev.name()} Start Time", ev["Start Time"])
+            params.setdefault(f"{ev.name()} Duration", ev["Duration"])
+            params.setdefault(f"{ev.name()} Odor", ev["Odor"])
+        return params
 
     def listSequence(self):
-        # for if this task is being combinatorially expanded
-        raise "TODO"
-
-    # TODO should this also let the user select which group of odors is active? it's not much more.
-    # TODO "result" format? ndarray with vals at expected time points?
+        params = {}
+        # for if this task is being combinatorially expanded. output eventually gets sent to generateTask
+        # TODO
+        for ev in self._events:
+            if ev["Start Time"] is None:
+                params[f"{ev.name()} Start Time"] = []
+            if ev["Duration"] is None:
+                params[f"{ev.name()} Duration"] = []
+            if ev["Odor"] is None:
+                params[f"{ev.name()} Odor"] = []
+        return params
 
 
 class OdorTask(DeviceTask):
-    def __init__(self, dev, cmd, parentTask):
-        """cmd structure: """
+    def __init__(self, dev: OdorDelivery, cmd: dict, parentTask):
+        """
+        cmd: dict
+            Structure: {"Event 0 Start Time": start_in_s, "Event 0 Duration": dur_in_s, "Event 0 Odor": (chan, port)}
+        """
         super().__init__(dev, cmd, parentTask)
         self._cmd = cmd
+        self._events = {}
+        for key, val in cmd.items():
+            _, ev_num, *opt_name = key.split(" ")
+            opt_name = " ".join(opt_name)
+            self._events.setdefault(ev_num, {})[opt_name] = val
+        self._events = self._events.values()  # the number is just to group the opts
         self.dev.setAllChannelsOff()
-        # TODO turn on control bit for all relevant channels
+        self._future = None
+        self._result = None
+        chans_in_use = {opts["Odor"][0] for opts in self._events}
+        for chan in chans_in_use:
+            self.dev.setChannelValue(chan, 1)
         # TODO set up the DAQ trigger signal
 
     def configure(self):
@@ -149,16 +254,18 @@ class OdorTask(DeviceTask):
         pass
 
     def isDone(self):
-        pass  # todo
+        return self._future is not None and self._future.isDone()
 
     def getResult(self):
-        raise "TODO"  # save the cmd
+        # TODO format? ndarray with vals at expected time points, or just the config?
+        return self._events
 
     def start(self):
-        pass  # TODO
+        self._future = OdorFuture(self.dev, self._events)
 
     def stop(self, **kwargs):
-        pass  # TODO
+        if self._future is not None:
+            self._future.stop(reason=kwargs.get("reason"))
 
 
 class OdorFuture(Future):
@@ -166,6 +273,7 @@ class OdorFuture(Future):
         super().__init__()
         self._dev = dev
         self._schedule = schedule
+        self._duration = max(ev["Start Time"] + ev["Duration"] for ev in schedule)
         self._thread = threading.Thread(target=self._executeSchedule)
         self._thread.start()
 
@@ -175,9 +283,36 @@ class OdorFuture(Future):
         return 0  # TODO
 
     def _executeSchedule(self):
+        start = datetime.now()
+        chan_values = {}
+        while True:
+            # TODO wait for signal
+            sleep(0.01)
+            now = (datetime.now() - start).total_seconds()
+            if now > self._duration:
+                for chan in chan_values:
+                    self._dev.setChannelValue(chan, 1)
+                break
+            for event in self._schedule:
+                chan, port = event["Odor"]
+                if chan not in chan_values:
+                    chan_values[chan] = 1
+                end_time = event["Start Time"] + event["Duration"]
+                if now >= end_time:
+                    if chan_values[chan] & port == 1:
+                        chan_values[chan] ^= port
+                        if chan_values[chan] == 0:
+                            chan_values[chan] = 1
+                        self._dev.setChannelValue(chan, chan_values[chan])
+                elif now >= event["Start Time"]:
+                    if chan_values[chan] & port == 0:
+                        chan_values[chan] &= 0xFE  # Turn off control
+                        chan_values[chan] |= port
+                        self._dev.setChannelValue(chan, chan_values[chan])
+
+        self._isDone = True
         # optionally wait for trigger
         # for each element ((channel, value), ...), duration) of the schedule:
         #     reset channels to 0, maybe?
         #     set new channel values
         #     wait until duration has passed
-        pass  # TODO
