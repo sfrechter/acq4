@@ -73,7 +73,7 @@ class OdorDevGui(Qt.QWidget):
             channel = group_config["channel"]
             group_box = Qt.QGroupBox(f"{channel}: {group_name}")
             group_box.setCheckable(True)
-            group_box.setChecked(False)
+            group_box.setChecked(True)
             group_box.setObjectName(group_name)
             group_box.clicked.connect(self._handleOffButtonPush)
             group_layout = Qt.FlowLayout()
@@ -82,20 +82,26 @@ class OdorDevGui(Qt.QWidget):
             button_group = Qt.QButtonGroup()
             self._buttonGroups[group_name] = button_group
 
-            control_button = Qt.QRadioButton(f"{channel}[1]: Control")
-            control_button.setObjectName(f"{channel}:1")
-            control_button.setChecked(True)
-            group_layout.addWidget(control_button)
-            button_group.addButton(control_button)
-            control_button.clicked.connect(self._handleOdorButtonPush)
-            self._controlButtons[group_name] = control_button
+            if 1 not in group_config["ports"]:
+                control_button = Qt.QRadioButton(f"{channel}[1]: Control")
+                control_button.setObjectName(f"{channel}:1")
+                control_button.setChecked(True)
+                group_layout.addWidget(control_button)
+                button_group.addButton(control_button)
+                control_button.clicked.connect(self._handleOdorButtonPush)
+                self._controlButtons[group_name] = control_button
 
             for port, odor in group_config["ports"].items():
+                if port == 0:  # Off is handled by group_box
+                    continue
                 button = Qt.QRadioButton(f"{channel}[{port}]: {odor}")
                 button.setObjectName(f"{channel}:{port}")
                 group_layout.addWidget(button)
                 button_group.addButton(button)
                 button.clicked.connect(self._handleOdorButtonPush)
+                if port == 1:
+                    self._controlButtons[group_name] = button
+                    button.setChecked(True)
 
     def _handleOffButtonPush(self, enabled):
         btn = self.sender()
@@ -241,11 +247,9 @@ class OdorTask(DeviceTask):
             opt_name = " ".join(opt_name)
             self._events.setdefault(ev_num, {})[opt_name] = val
         self._events = self._events.values()  # the number is just to group the opts
-        self.dev.setAllChannelsOff()
         self._future = None
         self._result = None
-        chans_in_use = {opts["Odor"][0] for opts in self._events}
-        for chan in chans_in_use:
+        for chan in self.dev.odorChannels():
             self.dev.setChannelValue(chan, 1)
         # TODO set up the DAQ trigger signal
 
@@ -311,8 +315,3 @@ class OdorFuture(Future):
                         self._dev.setChannelValue(chan, chan_values[chan])
 
         self._isDone = True
-        # optionally wait for trigger
-        # for each element ((channel, value), ...), duration) of the schedule:
-        #     reset channels to 0, maybe?
-        #     set new channel values
-        #     wait until duration has passed
