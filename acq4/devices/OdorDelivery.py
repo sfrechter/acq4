@@ -148,7 +148,7 @@ class OdorTaskGui(TaskGui):
         # TODO ui for sequences of odor events (by channel? just a select-y list?)
 
     def _addNewOdorEvent(self):  # ignore args: self, typ
-        ev = GroupParameter(name=f"Event {self._next_event_number}")
+        ev = GroupParameter(name=f"Event {self._next_event_number}", removable=True)
         self._next_event_number += 1
         ev.addChildren(
             [
@@ -168,7 +168,11 @@ class OdorTaskGui(TaskGui):
 
         ev = self._params.addChild(ev)
         self._events.append(ev)
+        ev.sigRemoved.connect(self._handleEventRemoval)
         self._redrawPlot()
+
+    def _handleEventRemoval(self, event):
+        self._events = [ev for ev in self._events if ev != event]
 
     def _redrawPlot(self):
         self._plot.clear()
