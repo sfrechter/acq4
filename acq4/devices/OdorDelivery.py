@@ -129,22 +129,24 @@ class OdorTaskGui(TaskGui):
         self._events = []
         self._next_event_number = 0
         self.taskRunner.sigTaskChanged.connect(self._redrawPlot)
-        self._layout = Qt.QGridLayout()
-        self.setLayout(self._layout)
-
-        self._plot = PlotWidget()
-        self._layout.addWidget(self._plot, 0, 1)
+        layout = Qt.QHBoxLayout()
+        self.setLayout(layout)
+        splitter = Qt.QSplitter()
+        splitter.setOrientation(Qt.Qt.Horizontal)
+        splitter.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(splitter)
 
         self._params = GroupParameter(name="Odor Events", addText="Add Odor Event")
         self._params.sigTreeStateChanged.connect(self._redrawPlot)
         self._params.sigAddNew.connect(self._addNewOdorEvent)
         ptree = ParameterTree()
         ptree.addParameters(self._params)
-        self._layout.addWidget(ptree, 0, 0)
-        # TODO priming instructions?
-        # TODO validate if odors are happening simultaneously
+        splitter.addWidget(ptree)
+
+        self._plot = PlotWidget()
+        splitter.addWidget(self._plot)
+
         # TODO validate if the events will go longer than the total task runner
-        # TODO ui for removing odor events
         # TODO ui for sequences of odor events (by channel? just a select-y list?)
 
     def _addNewOdorEvent(self):  # ignore args: self, typ
