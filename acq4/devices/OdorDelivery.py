@@ -8,7 +8,7 @@ import numpy as np
 
 from pyqtgraph import PlotWidget, intColor, mkPen, siFormat
 from pyqtgraph.parametertree import ParameterTree
-from pyqtgraph.parametertree.parameterTypes import GroupParameter, SimpleParameter, ListParameter
+from pyqtgraph.parametertree.parameterTypes import GroupParameter, ListParameter
 from .Device import Device, TaskGui, DeviceTask
 from ..util import Qt
 from ..util.future import Future
@@ -34,8 +34,8 @@ class OdorDelivery(Device):
 
     def odorsAsParameterLimits(self):
         return {
-            f"{chanOpts['channel']}[{port}]: {name}": (chanOpts["channel"], port)
-            for name, chanOpts in self.odors.items()
+            f"{chanName}[{port}]: {name}": (chanOpts["channel"], port)
+            for chanName, chanOpts in self.odors.items()
             for port, name in chanOpts["ports"].items()
         }
 
@@ -134,34 +134,32 @@ class OdorDevGui(Qt.QWidget):
         self.dev.setChannelValue(channel, port)
 
 
-# previously
-# SeqParameter
 class _ListSeqParameter(ListParameter):
     def __init__(self, **kwargs):
         kwargs["expanded"] = kwargs.get("expanded", False)
         super().__init__(**kwargs)
-        initialParams = [ch.name() for ch in self]
-        groups = {}
-        if "group_by" in kwargs:
-            for name, fn in kwargs["group_by"].items():
-                groups[name] = {}
-                for n, v in kwargs["limits"].items():
-                    groups[name].setdefault(fn(n, v), {})[n] = v
-
+        initialParams = [p.name() for p in self]
+        sequence_names = ["off", "select"]
         newParams = [
-            {"name": "sequence", "type": "list", "value": "off", "values": ["off", "grouping", "select"]},
-            {"name": "grouping", "type": "list", "value": "", "visible": False, "limits": groups},
-            # {"name": "select", "type": "group", "addText": "Add odor", "visible": False, "children": {TODO}},
+            {"name": "sequence", "type": "list", "value": "off", "values": sequence_names},
+            # {"name": "select", "type": "group", "addText": "Add odor", "visible": False, "children": kwargs["limits"]},  # TODO
             {"name": "randomize", "type": "bool", "value": False, "visible": False},
         ]
-        for ch in newParams:
-            self.addChild(ch)
-
         self.visibleParams = {  # list of params to display in each mode
             "off": initialParams + ["sequence"],
-            "grouping": initialParams + ["sequence", "grouping", "randomize"],
             "select": initialParams + ["sequence", "select", "randomize"],
         }
+        if "group_by" in kwargs:
+            for name, fn in kwargs["group_by"].items():
+                grouping = {}
+                for n, v in kwargs["limits"].items():
+                    grouping.setdefault(fn(n, v), []).append(v)
+                sequence_names.append(name)
+                newParams.append({"name": name, "type": "list", "visible": False, "limits": grouping})
+                self.visibleParams[name] = initialParams + ["sequence", name, "randomize"]
+
+        for ch in newParams:
+            self.addChild(ch)
 
     def hasSequenceValue(self):
         return self["sequence"] == "off"
@@ -174,12 +172,13 @@ class _ListSeqParameter(ListParameter):
             "default": self.valueString(self),
             "sequence": self["sequence"],
         }
-        if self["sequence"] == "grouping":
-            seqData["grouping"] = self["grouping"]
+        # TODO for all sequence-y versions, collect the final list of actual values
+        if self["sequence"] == "select":
+            seqData["sequence"] = self["select"]
             # TODO
             seqData["randomize"] = self["randomize"]
-        elif self["sequence"] == "select":
-            seqData["select"] = self["select"]
+        elif self["sequence"] != "off":  # arbitrarily-named groupings
+            seqData["sequence"] = self[self["sequence"]]
             # TODO
             seqData["randomize"] = self["randomize"]
         return name, seqData
@@ -272,7 +271,7 @@ class OdorTaskGui(TaskGui):
                     name="Odor",
                     type="list",
                     limits=self.dev.odorsAsParameterLimits(),
-                    group_by={"channel": lambda name, address: address[0]},
+                    group_by={"channel": lambda name, address: str(address[0])},  # TODO channel name in here
                 ),
             ]
         )
@@ -406,7 +405,6 @@ class OdorFuture(Future):
         start = datetime.now()
         chan_values = {}
         while True:
-            # TODO wait for signal
             sleep(0.01)
             now = (datetime.now() - start).total_seconds()
             if now > self._duration:
