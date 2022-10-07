@@ -9,13 +9,12 @@ from collections import OrderedDict
 import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.dockarea as dockarea
-from pyqtgraph import ptime
 from pyqtgraph.graphicsItems.ROI import RulerROI
 from pyqtgraph.metaarray import MetaArray
 from six.moves import range
 
 import acq4.Manager as Manager
-from acq4.util import Qt
+from acq4.util import Qt, ptime
 from acq4.util.Mutex import Mutex
 from acq4.util.StatusBar import StatusBar
 from acq4.util.Thread import Thread

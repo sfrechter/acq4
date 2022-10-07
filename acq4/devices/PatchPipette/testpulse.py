@@ -4,9 +4,8 @@ import warnings
 
 import numpy as np
 import scipy.optimize, scipy.ndimage
-from pyqtgraph import ptime
 from ...Manager import getManager
-from acq4.util import Qt
+from acq4.util import Qt, ptime
 from acq4.util.Thread import Thread
 from acq4.util.Mutex import Mutex
 from acq4.util.debug import printExc
