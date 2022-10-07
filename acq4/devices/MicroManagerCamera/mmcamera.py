@@ -1,11 +1,9 @@
-# -*- coding: utf-8 -*-
-from __future__ import division, with_statement, print_function
-
 from collections import OrderedDict
 
 import numpy as np
 import six
 import time
+from functools import lru_cache
 from six.moves import range
 
 import acq4.util.ptime as ptime
@@ -13,12 +11,8 @@ from acq4.devices.Camera import Camera
 from acq4.util import micromanager
 from acq4.util.Mutex import Mutex
 from acq4.util.debug import printExc
+from acq4.util.micromanager import MicroManagerError
 from pyqtgraph.debug import Profiler
-
-try:
-    from functools import lru_cache
-except ImportError:
-    from backports.functools_lru_cache import lru_cache
 
 # Micromanager does not standardize trigger modes across cameras,
 # so we use this dict to translate the modes of various cameras back
@@ -290,15 +284,19 @@ class MicroManagerCamera(Camera):
 
         newVals = {}
         for k, v in params.items():
-            self._setParam(k, v, autoCorrect=autoCorrect)
-            p('setParam %r' % k)
-            if k == 'binning':
-                newVals['binningX'], newVals['binningY'] = self.getParam(k)
-            elif k == 'region':
-                newVals['regionX'], newVals['regionY'], newVals['regionW'], newVals['regionH'] = self.getParam(k)
+            try:
+                self._setParam(k, v, autoCorrect=autoCorrect)
+            except MicroManagerError as e:
+                printExc(f"Unable to set {k} param to {v}: {e}")
             else:
-                newVals[k] = self.getParam(k)
-            p('reget param')
+                p(f'setParam {k!r}')
+                if k == 'binning':
+                    newVals['binningX'], newVals['binningY'] = self.getParam(k)
+                elif k == 'region':
+                    newVals['regionX'], newVals['regionY'], newVals['regionW'], newVals['regionH'] = self.getParam(k)
+                else:
+                    newVals[k] = self.getParam(k)
+                p('reget param')
         self.sigParamsChanged.emit(newVals)
         p('emit')
 
