@@ -5,12 +5,14 @@ from time import sleep
 from typing import Union
 
 import numpy as np
-from pyqtgraph import PlotWidget, intColor, mkPen
+
+from pyqtgraph import PlotWidget, intColor, mkPen, siFormat
 from pyqtgraph.parametertree import ParameterTree
-from pyqtgraph.parametertree.parameterTypes import GroupParameter
+from pyqtgraph.parametertree.parameterTypes import GroupParameter, SimpleParameter, ListParameter
 from .Device import Device, TaskGui, DeviceTask
 from ..util import Qt
 from ..util.future import Future
+from ..util.generator.StimParamSet import SeqParameter
 
 
 class OdorDelivery(Device):
@@ -30,6 +32,13 @@ class OdorDelivery(Device):
     def odorChannels(self):
         return sorted([gr["channel"] for gr in self.odors.values()])
 
+    def odorsAsParameterLimits(self):
+        return {
+            f"{chanOpts['channel']}[{port}]: {name}": (chanOpts["channel"], port)
+            for name, chanOpts in self.odors.items()
+            for port, name in chanOpts["ports"].items()
+        }
+
     def setChannelValue(self, channel: int, value: int):
         """Turn a given odor channel value"""
         raise NotImplementedError()
@@ -46,6 +55,7 @@ class OdorDelivery(Device):
         return OdorTaskGui(self, task)
 
     def createTask(self, cmd, parentTask):
+        """cmd will be coming in from the TaskGui.generateTask with whatever data I want it to have"""
         return OdorTask(self, cmd, parentTask)
 
 
@@ -61,6 +71,7 @@ class OdorDevGui(Qt.QWidget):
 
     def __init__(self, dev: OdorDelivery):
         super().__init__()
+        # TODO configuration option for being able to activate multiple channels at the same time
         self.dev = dev
         self.layout = Qt.FlowLayout()
         self.setLayout(self.layout)
@@ -123,6 +134,107 @@ class OdorDevGui(Qt.QWidget):
         self.dev.setChannelValue(channel, port)
 
 
+# previously
+# SeqParameter
+class _ListSeqParameter(ListParameter):
+    def __init__(self, **kwargs):
+        kwargs["expanded"] = kwargs.get("expanded", False)
+        super().__init__(**kwargs)
+        initialParams = [ch.name() for ch in self]
+        groups = {}
+        if "group_by" in kwargs:
+            for name, fn in kwargs["group_by"].items():
+                groups[name] = {}
+                for n, v in kwargs["limits"].items():
+                    groups[name].setdefault(fn(n, v), {})[n] = v
+
+        newParams = [
+            {"name": "sequence", "type": "list", "value": "off", "values": ["off", "grouping", "select"]},
+            {"name": "grouping", "type": "list", "value": "", "visible": False, "limits": groups},
+            # {"name": "select", "type": "group", "addText": "Add odor", "visible": False, "children": {TODO}},
+            {"name": "randomize", "type": "bool", "value": False, "visible": False},
+        ]
+        for ch in newParams:
+            self.addChild(ch)
+
+        self.visibleParams = {  # list of params to display in each mode
+            "off": initialParams + ["sequence"],
+            "grouping": initialParams + ["sequence", "grouping", "randomize"],
+            "select": initialParams + ["sequence", "select", "randomize"],
+        }
+
+    def hasSequenceValue(self):
+        return self["sequence"] == "off"
+
+    def compile(self):
+        if self.hasSequenceValue():
+            return self.valueString(self), None
+        name = f"{self.parent().varName()}_{self.name()}"
+        seqData = {
+            "default": self.valueString(self),
+            "sequence": self["sequence"],
+        }
+        if self["sequence"] == "grouping":
+            seqData["grouping"] = self["grouping"]
+            # TODO
+            seqData["randomize"] = self["randomize"]
+        elif self["sequence"] == "select":
+            seqData["select"] = self["select"]
+            # TODO
+            seqData["randomize"] = self["randomize"]
+        return name, seqData
+
+    def valueString(self, param):
+        # TODO
+        units = param.opts.get("units", None)
+        if isinstance(units, str) and len(units) > 0:
+            return siFormat(param.value(), suffix=units, space="*", precision=5, allowUnicode=False)
+        else:
+            return f"{param.value():0.5g}"
+
+    def setState(self, state):
+        self.setValue(state["value"])
+        self.setDefault(state["value"])
+        for k in state:
+            if k == "value":
+                continue
+            self[k] = state[k]
+            self.param(k).setDefault(state[k])
+
+    def getState(self):
+        state = {}
+        for ch in self:
+            if not ch.opts["visible"]:
+                continue
+            name = ch.name()
+            val = ch.value()
+            if val is False:
+                continue
+            state[name] = val
+        state["value"] = self.value()
+        return state
+
+    def treeStateChanged(self, param, changes):
+        # catch changes to 'sequence' so we can hide/show other params.
+        # Note: it would be easier to just catch self.sequence.sigValueChanged,
+        # but this approach allows us to block tree change events so they are all
+        # released as a single update.
+        with self.treeChangeBlocker():
+            # queue up change
+            super().treeStateChanged(param, changes)
+
+            # if needed, add some more changes before releasing the signal
+            for param, change, data in changes:
+                # if the sequence value changes, hide/show other parameters
+                if param is self.param("sequence") and change == "value":
+                    vis = self.visibleParams[self["sequence"]]
+                    for ch in self:
+                        if ch.name() in vis:
+                            ch.show()
+                        else:
+                            ch.hide()
+
+
 class OdorTaskGui(TaskGui):
     def __init__(self, dev: OdorDelivery, taskRunner):
         super().__init__(dev, taskRunner)
@@ -154,16 +266,13 @@ class OdorTaskGui(TaskGui):
         self._next_event_number += 1
         ev.addChildren(
             [
-                dict(name="Start Time", type="float", limits=(0, None), units="s", siPrefix=True),
-                dict(name="Duration", type="float", limits=(0, None), units="s", siPrefix=True, value=0.1),
-                dict(
+                SeqParameter(name="Start Time", type="float", limits=(0, None), units="s", siPrefix=True),
+                SeqParameter(name="Duration", type="float", limits=(0, None), units="s", siPrefix=True, value=0.1),
+                _ListSeqParameter(
                     name="Odor",
                     type="list",
-                    limits={
-                        f"{chanOpts['channel']}[{port}]: {name}": (chanOpts["channel"], port)
-                        for name, chanOpts in self.dev.odors.items()
-                        for port, name in chanOpts["ports"].items()
-                    },
+                    limits=self.dev.odorsAsParameterLimits(),
+                    group_by={"channel": lambda name, address: address[0]},
                 ),
             ]
         )
@@ -181,7 +290,7 @@ class OdorTaskGui(TaskGui):
         chan_names = {conf["channel"]: chan for chan, conf in self.dev.odors.items()}
         self._plot.addLegend()
         if self._events:
-            chans_in_use = {ev["Odor"][0] for ev in self._events}
+            chans_in_use = {ev["Odor"][0] for ev in self._events if ev["Odor"]}
 
             def get_precision(a):
                 if a == 0:
@@ -202,10 +311,11 @@ class OdorTaskGui(TaskGui):
             for ev in self._events:
                 start = int(ev["Start Time"] * (10 ** precision))
                 length = int(ev["Duration"] * (10 ** precision))
-                chan, val = ev["Odor"]
-                end = min((start + length, point_count))
-                arrays[chan][start:end] &= 0xFE  # turn off control (1) for the duration
-                arrays[chan][start:end] |= val
+                if ev["Odor"]:
+                    chan, val = ev["Odor"]
+                    end = min((start + length, point_count))
+                    arrays[chan][start:end] &= 0xFE  # turn off control (1) for the duration
+                    arrays[chan][start:end] |= val
             time_vals = np.linspace(0, task_duration, point_count)
             for chan, arr in arrays.items():
                 self._plot.plot(time_vals, arr, name=chan_names[chan], pen=mkPen(color=intColor(chan, max(arrays) + 1)))
