@@ -9,7 +9,7 @@ from six.moves import range
 import acq4.util.ptime as ptime
 from acq4.devices.Camera import Camera
 from acq4.util import micromanager
-from acq4.util.Mutex import Mutex
+from acq4.util.Mutex import RecursiveMutex
 from acq4.util.debug import printExc
 from acq4.util.micromanager import MicroManagerError
 from pyqtgraph.debug import Profiler
@@ -45,7 +45,7 @@ class MicroManagerCamera(Camera):
         self._triggerProp = None  # the name of the property for setting trigger mode
         self._triggerModes = ({}, {})  # forward and reverse mappings for the names of trigger modes
         self._binningMode = None  # 'x' or 'xy' for binning strings like '1' and '1x1', respectively
-        self.camLock = Mutex(Mutex.Recursive)  ## Lock to protect access to camera
+        self.camLock = RecursiveMutex()  ## Lock to protect access to camera
         self._config = config
         Camera.__init__(self, manager, config, name)  ## superclass will call setupCamera when it is ready.
         self.acqBuffer = None
