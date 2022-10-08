@@ -1,8 +1,10 @@
+from collections import namedtuple
+
 import math
 import threading
 from datetime import datetime
 from time import sleep
-from typing import Union
+from typing import Union, List
 
 import numpy as np
 
@@ -348,6 +350,9 @@ class OdorTaskGui(TaskGui):
         return params
 
 
+OdorEvent = namedtuple("OdorEvent", ["startTime", "duration", "odor"])
+
+
 class OdorTask(DeviceTask):
     def __init__(self, dev: OdorDelivery, cmd: dict, parentTask):
         """
@@ -356,17 +361,20 @@ class OdorTask(DeviceTask):
         """
         super().__init__(dev, cmd, parentTask)
         self._cmd = cmd
-        self._events = {}
-        for key, val in cmd.items():
-            _, ev_num, *opt_name = key.split(" ")
-            opt_name = " ".join(opt_name)
-            self._events.setdefault(ev_num, {})[opt_name] = val
-        self._events = self._events.values()  # the number is just to group the opts
+        self._events: List[OdorEvent] = []
+        first_chan = None
+        i = 0
+        while i < len(cmd) / 3:
+            self._events.append(
+                OdorEvent(cmd[f"Event {i} Start Time"], cmd[f"Event {i} Duration"], cmd[f"Event {i} Odor"])
+            )
+            if first_chan is None:
+                first_chan = cmd[f"Event {i} Odor"][0]
+            i += 1
         self._future = None
         self._result = None
         for chan in self.dev.odorChannels():
-            self.dev.setChannelValue(chan, 1)
-        # TODO set up the DAQ trigger signal
+            self.dev.setChannelValue(chan, 1 if chan == first_chan else 0)
 
     def configure(self):
         # TODO if using a trigger line, we can start the listening thread
@@ -388,11 +396,11 @@ class OdorTask(DeviceTask):
 
 
 class OdorFuture(Future):
-    def __init__(self, dev, schedule):
+    def __init__(self, dev, schedule: List[OdorEvent]):
         super().__init__()
         self._dev = dev
         self._schedule = schedule
-        self._duration = max(ev["Start Time"] + ev["Duration"] for ev in schedule)
+        self._duration = max(ev.startTime + ev.duration for ev in schedule)
         self._thread = threading.Thread(target=self._executeSchedule)
         self._thread.start()
 
@@ -409,20 +417,20 @@ class OdorFuture(Future):
             now = (datetime.now() - start).total_seconds()
             if now > self._duration:
                 for chan in chan_values:
-                    self._dev.setChannelValue(chan, 1)
+                    self._dev.setChannelValue(chan, 0)
                 break
             for event in self._schedule:
-                chan, port = event["Odor"]
+                chan, port = event.odor
                 if chan not in chan_values:
                     chan_values[chan] = 1
-                end_time = event["Start Time"] + event["Duration"]
+                end_time = event.startTime + event.duration
                 if now >= end_time:
-                    if chan_values[chan] & port == 1:
+                    if chan_values[chan] & port > 0:
                         chan_values[chan] ^= port
                         if chan_values[chan] == 0:
                             chan_values[chan] = 1
                         self._dev.setChannelValue(chan, chan_values[chan])
-                elif now >= event["Start Time"]:
+                elif now >= event.startTime:
                     if chan_values[chan] & port == 0:
                         chan_values[chan] &= 0xFE  # Turn off control
                         chan_values[chan] |= port
