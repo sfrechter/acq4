@@ -144,7 +144,7 @@ class _ListSeqParameter(ListParameter):
         sequence_names = ["off", "select"]
         newParams = [
             {"name": "sequence", "type": "list", "value": "off", "values": sequence_names},
-            # {"name": "select", "type": "group", "addText": "Add odor", "visible": False, "children": kwargs["limits"]},  # TODO
+            {"name": "select", "type": "checklist", "visible": False, "limits": kwargs["limits"], "exclusive": False},
             {"name": "randomize", "type": "bool", "value": False, "visible": False},
         ]
         self.visibleParams = {  # list of params to display in each mode
@@ -170,20 +170,16 @@ class _ListSeqParameter(ListParameter):
         if self.hasSequenceValue():
             return self.valueString(self), None
         name = f"{self.parent().varName()}_{self.name()}"
-        seqData = {
-            "default": self.valueString(self),
-            "sequence": self["sequence"],
-        }
-        # TODO for all sequence-y versions, collect the final list of actual values
         if self["sequence"] == "select":
-            seqData["sequence"] = self["select"]
-            # TODO
-            seqData["randomize"] = self["randomize"]
-        elif self["sequence"] != "off":  # arbitrarily-named groupings
-            seqData["sequence"] = self[self["sequence"]]
-            # TODO
-            seqData["randomize"] = self["randomize"]
-        return name, seqData
+            seq = self["select"]
+        elif self["sequence"] != "off":
+            seq = []
+        else:  # arbitrarily-named groupings
+            key = self[self["sequence"]]
+            seq = self.forward[key]
+        if self["randomize"]:
+            np.random.shuffle(seq)
+        return name, seq
 
     def valueString(self, param):
         # TODO
@@ -194,11 +190,7 @@ class _ListSeqParameter(ListParameter):
             return f"{param.value():0.5g}"
 
     def setState(self, state):
-        self.setValue(state["value"])
-        self.setDefault(state["value"])
         for k in state:
-            if k == "value":
-                continue
             self[k] = state[k]
             self.param(k).setDefault(state[k])
 
