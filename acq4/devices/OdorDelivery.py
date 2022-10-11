@@ -163,12 +163,7 @@ class _ListSeqParameter(ListParameter):
         for ch in newParams:
             self.addChild(ch)
 
-    def hasSequenceValue(self):
-        return self["sequence"] == "off"
-
     def compile(self):
-        if self.hasSequenceValue():
-            return self.valueString(self), None
         name = f"{self.parent().name()}_{self.name()}"
         mode = self["sequence"]
         if mode == "select":
@@ -176,19 +171,10 @@ class _ListSeqParameter(ListParameter):
         elif mode == "off":
             seq = []
         else:  # arbitrarily-named groupings
-            key = self[mode]
-            seq = self.names[mode].forward[key]
+            seq = self[mode]
         if self["randomize"]:
             np.random.shuffle(seq)
         return name, seq
-
-    def valueString(self, param):
-        # TODO
-        units = param.opts.get("units", None)
-        if isinstance(units, str) and len(units) > 0:
-            return siFormat(param.value(), suffix=units, space="*", precision=5, allowUnicode=False)
-        else:
-            return f"{param.value():0.5g}"
 
     def setState(self, state):
         for k in state:
@@ -211,11 +197,11 @@ class _ListSeqParameter(ListParameter):
     def treeStateChanged(self, param, changes):
         # catch changes to 'sequence' so we can hide/show other params.
         # Note: it would be easier to just catch self.sequence.sigValueChanged,
-        # but this approach allows us to block tree change events so they are all
+        # but this approach allows us to block tree change events, so they are all
         # released as a single update.
         with self.treeChangeBlocker():
             # queue up change
-            super().treeStateChanged(param, changes)
+            ListParameter.treeStateChanged(self, param, changes)
 
             # if needed, add some more changes before releasing the signal
             for param, change, data in changes:
@@ -227,6 +213,11 @@ class _ListSeqParameter(ListParameter):
                             ch.show()
                         else:
                             ch.hide()
+
+
+class OdorEventParameter(GroupParameter):
+    def varName(self):
+        return self.name().replace(' ', '_')
 
 
 class OdorTaskGui(TaskGui):
@@ -256,7 +247,7 @@ class OdorTaskGui(TaskGui):
         # TODO ui for sequences of odor events (by channel? just a select-y list?)
 
     def _addNewOdorEvent(self):  # ignore args: self, typ
-        ev = GroupParameter(name=f"Event {self._next_event_number}", removable=True)
+        ev = OdorEventParameter(name=f"Event {self._next_event_number}", removable=True)
         self._next_event_number += 1
         ev.addChildren(
             [
@@ -271,13 +262,14 @@ class OdorTaskGui(TaskGui):
             ]
         )
 
-        ev = self._params.addChild(ev)
+        self._params.addChild(ev)
         self._events.append(ev)
         ev.sigRemoved.connect(self._handleEventRemoval)
         self._redrawPlot()
 
     def _handleEventRemoval(self, event):
         self._events = [ev for ev in self._events if ev != event]
+        self.sigSequenceChanged.emit(self.dev.name())
 
     def _redrawPlot(self):
         self._plot.clear()
@@ -313,6 +305,7 @@ class OdorTaskGui(TaskGui):
             time_vals = np.linspace(0, task_duration, point_count)
             for chan, arr in arrays.items():
                 self._plot.plot(time_vals, arr, name=chan_names[chan], pen=mkPen(color=intColor(chan, max(arrays) + 1)))
+        self.sigSequenceChanged.emit(self.dev.name())
 
     def saveState(self):
         raise "TODO"
@@ -331,15 +324,15 @@ class OdorTaskGui(TaskGui):
 
     def listSequence(self):
         params = {}
-        # for if this task is being combinatorially expanded. output eventually gets sent to generateTask
-        # TODO
         for ev in self._events:
-            if ev["Start Time"] is None:
-                params[f"{ev.name()} Start Time"] = []
-            if ev["Duration"] is None:
-                params[f"{ev.name()} Duration"] = []
-            if ev["Odor"] is None:
-                params[f"{ev.name()} Odor"] = []
+            if starts := ev.param("Start Time").compile()[1]:
+                params[f"{ev.name()} Start Time"] = starts
+
+            if durs := ev.param("Duration").compile()[1]:
+                params[f"{ev.name()} Duration"] = durs
+
+            if odors := ev.param("Odor").compile()[1]:
+                params[f"{ev.name()} Odor"] = odors
         return params
 
 

@@ -339,7 +339,7 @@ class TaskGui(Qt.QWidget):
         return self.saveState()  ## lazy; implement something nicer for your devices!
         
     def listSequence(self):
-        """Return an OrderedDict of sequence parameter names and lengths {name: length}"""
+        """Return an OrderedDict of sequence parameter names and values {name: list_of_values}"""
         return {}
         
     def generateTask(self, params=None):
