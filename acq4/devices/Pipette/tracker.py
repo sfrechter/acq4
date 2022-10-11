@@ -9,7 +9,7 @@ import scipy
 from six.moves import range
 
 from acq4.Manager import getManager
-from acq4.util import Qt
+from acq4.util import Qt, ptime
 from acq4.util.image_registration import imageTemplateMatch
 from .pipette_detection import TemplateMatchPipetteDetector
 
@@ -63,8 +63,8 @@ class PipetteTracker(object):
 
         imager.sigNewFrame.connect(newFrame)
         try:
-            start = pg.ptime.time()
-            while pg.ptime.time() < start + 5.0:
+            start = ptime.time()
+            while ptime.time() < start + 5.0:
                 Qt.QApplication.processEvents()
                 frame = self.__nextFrame
                 if frame is not None:

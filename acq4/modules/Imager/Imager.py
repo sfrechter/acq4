@@ -38,7 +38,7 @@ from acq4.devices.Microscope import Microscope
 from acq4.devices.Scanner.scan_program import ScanProgram
 from acq4.modules.Camera import CameraModuleInterface
 from acq4.modules.Module import Module
-from acq4.util import Qt
+from acq4.util import Qt, ptime
 from acq4.util import imaging
 from acq4.util.Mutex import Mutex
 from acq4.util.Thread import Thread
@@ -1229,7 +1229,7 @@ class ImagingThread(Thread):
         task = self.manager.createTask(copy.deepcopy(prot))
 
         dur = prot["protocol"]["duration"]
-        start = pg.ptime.time()
+        start = ptime.time()
         endtime = start + dur - 0.005
 
         # Start the task
@@ -1243,7 +1243,7 @@ class ImagingThread(Thread):
                 task.abort()
                 self._abort = False
                 raise Exception("Imaging acquisition aborted")
-            now = pg.ptime.time()
+            now = ptime.time()
             if now < endtime:
                 # long sleep until we expect the protocol to be almost done
                 time.sleep(min(0.1, endtime - now))
