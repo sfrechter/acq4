@@ -244,7 +244,6 @@ class OdorTaskGui(TaskGui):
         splitter.addWidget(self._plot)
 
         # TODO validate if the events will go longer than the total task runner
-        # TODO ui for sequences of odor events (by channel? just a select-y list?)
 
     def _addNewOdorEvent(self):  # ignore args: self, typ
         ev = OdorEventParameter(name=f"Event {self._next_event_number}", removable=True)
@@ -348,23 +347,19 @@ class OdorTask(DeviceTask):
         super().__init__(dev, cmd, parentTask)
         self._cmd = cmd
         self._events: List[OdorEvent] = []
-        first_chan = None
         i = 0
         while i < len(cmd) / 3:
             self._events.append(
                 OdorEvent(cmd[f"Event {i} Start Time"], cmd[f"Event {i} Duration"], cmd[f"Event {i} Odor"])
             )
-            if first_chan is None:
-                first_chan = cmd[f"Event {i} Odor"][0]
             i += 1
         self._future = None
         self._result = None
-        for chan in self.dev.odorChannels():
-            self.dev.setChannelValue(chan, 1 if chan == first_chan else 0)
 
     def configure(self):
-        # TODO if using a trigger line, we can start the listening thread
-        pass
+        first_chan = self._events[0].odor[0]
+        for chan in self.dev.odorChannels():
+            self.dev.setChannelValue(chan, 1 if chan == first_chan else 0)
 
     def isDone(self):
         return self._future is not None and self._future.isDone()
@@ -387,13 +382,14 @@ class OdorFuture(Future):
         self._dev = dev
         self._schedule = schedule
         self._duration = max(ev.startTime + ev.duration for ev in schedule)
+        self._time_elapsed = 0
         self._thread = threading.Thread(target=self._executeSchedule)
         self._thread.start()
 
     def percentDone(self):
         if self.isDone():
             return 100
-        return 0  # TODO
+        return 100 * self._time_elapsed / self._duration
 
     def _executeSchedule(self):
         start = datetime.now()
@@ -401,6 +397,7 @@ class OdorFuture(Future):
         while True:
             sleep(0.01)
             now = (datetime.now() - start).total_seconds()
+            self._time_elapsed = now
             if now > self._duration:
                 for chan in chan_values:
                     self._dev.setChannelValue(chan, 0)
