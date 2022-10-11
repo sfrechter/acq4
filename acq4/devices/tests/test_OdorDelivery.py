@@ -4,8 +4,10 @@ import time
 
 import unittest
 
+import pyqtgraph as pg
 from acq4.devices.MockOdorDelivery import MockOdorDelivery
 from acq4.devices.OdorDelivery import OdorTask, _ListSeqParameter
+from pyqtgraph.parametertree.parameterTypes import GroupParameter
 
 
 class OdorDeliveryTests(unittest.TestCase):
@@ -41,11 +43,14 @@ class OdorDeliveryTests(unittest.TestCase):
 
 class _ListSeqParameterTest(unittest.TestCase):
     def test_sequence_compile(self):
+        pg.mkQApp()  # for the checklist thread, apparently
+        parent = GroupParameter(name="test")
         p = _ListSeqParameter(
             name="Test",
             type="list",
             limits={"a": 10, "b": 11, "c": 3, "d": 8, "e": 7},
             group_by={"oddness": lambda name, num: num % 2 > 0}
         )
+        parent.addChild(p)  # for the parent().varName()
         p.setState({"sequence": "oddness", "oddness": True})
-        self.assertEqual(p["oddness"], [11, 3, 7])
+        self.assertEqual(p.compile()[1], [11, 3, 7])

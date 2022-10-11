@@ -169,14 +169,15 @@ class _ListSeqParameter(ListParameter):
     def compile(self):
         if self.hasSequenceValue():
             return self.valueString(self), None
-        name = f"{self.parent().varName()}_{self.name()}"
-        if self["sequence"] == "select":
+        name = f"{self.parent().name()}_{self.name()}"
+        mode = self["sequence"]
+        if mode == "select":
             seq = self["select"]
-        elif self["sequence"] != "off":
+        elif mode == "off":
             seq = []
         else:  # arbitrarily-named groupings
-            key = self[self["sequence"]]
-            seq = self.forward[key]
+            key = self[mode]
+            seq = self.names[mode].forward[key]
         if self["randomize"]:
             np.random.shuffle(seq)
         return name, seq
