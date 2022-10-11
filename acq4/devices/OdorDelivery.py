@@ -1,14 +1,13 @@
 from collections import namedtuple
 
 import math
+import numpy as np
 import threading
 from datetime import datetime
 from time import sleep
-from typing import Union, List
+from typing import Union, List, Dict, Tuple
 
-import numpy as np
-
-from pyqtgraph import PlotWidget, intColor, mkPen, siFormat
+from pyqtgraph import PlotWidget, intColor, mkPen
 from pyqtgraph.parametertree import ParameterTree
 from pyqtgraph.parametertree.parameterTypes import GroupParameter, ListParameter
 from .Device import Device, TaskGui, DeviceTask
@@ -18,7 +17,25 @@ from ..util.generator.StimParamSet import SeqParameter
 
 
 class OdorDelivery(Device):
-    # {channel_name: {channel: number, ports: {port_number: odor_name, ...}}, ...}
+    """
+    Device class representing an odor delivery device. Config should include a section describing all the possible
+    odors in the following format::
+
+        odors:
+            first channel name:
+                channel: 0
+                ports:
+                    2: 'first odor name'
+                    4: 'second odor name'
+                    ...
+            second channel name:
+                channel: 1
+                ports:
+                    2: 'first odor name'
+                    4: 'second odor name'
+                    ...
+            ...
+    """
     odors: "dict[str, dict[str, Union[int, dict[int, str]]]]"
 
     def __init__(self, deviceManager, config: dict, name: str):
@@ -31,21 +48,21 @@ class OdorDelivery(Device):
             for group, group_config in config.get("odors", {}).items()
         }
 
-    def odorChannels(self):
+    def odorChannels(self) -> List[int]:
         return sorted([gr["channel"] for gr in self.odors.values()])
 
-    def odorsAsParameterLimits(self):
+    def odorsAsParameterLimits(self) -> Dict[str, Tuple[int, int]]:
         return {
             f"{chanName}[{port}]: {name}": (chanOpts["channel"], port)
             for chanName, chanOpts in self.odors.items()
             for port, name in chanOpts["ports"].items()
         }
 
-    def setChannelValue(self, channel: int, value: int):
+    def setChannelValue(self, channel: int, value: int) -> None:
         """Turn a given odor channel value"""
         raise NotImplementedError()
 
-    def setAllChannelsOff(self):
+    def setAllChannelsOff(self) -> None:
         """Turn off all odors. (Reimplement if that should be handled other than by iterating)"""
         for ch in self.odorChannels():
             self.setChannelValue(ch, 0)
