@@ -349,7 +349,8 @@ class TaskGui(Qt.QWidget):
     def generateTask(self, params: "Dict | None" = None) -> dict:
         """
         This method should convert params' index-values back into task-values, along with any default work non-sequenced
-        tasks need.
+        tasks need. WARNING! Long sequences will not automatically lock the UI or preserve the state of your parameter
+        sequences. The example code below will break if a user messes with anything while the task sequence is running.
 
         :param params:
             This dictionary will have the same top-level shape as the return value of listSequence, but instead of a
@@ -365,7 +366,7 @@ class TaskGui(Qt.QWidget):
         """
         if params is None:
             params = {}
-        paramSpace = self.listSequence()
+        paramSpace = self.listSequence()  # WARNING! This is not reliable!
         params = {k: paramSpace[k][v] for k, v in params.items()}
         return params
         
