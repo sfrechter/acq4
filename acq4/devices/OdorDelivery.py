@@ -5,7 +5,7 @@ import numpy as np
 import threading
 from datetime import datetime
 from time import sleep
-from typing import Union, List, Dict, Tuple
+from typing import Union, List, Dict, Tuple, Any
 
 from pyqtgraph import PlotWidget, intColor, mkPen
 from pyqtgraph.parametertree import ParameterTree
@@ -245,6 +245,8 @@ class OdorEventParameter(GroupParameter):
 
 
 class OdorTaskGui(TaskGui):
+    _events: List[OdorEventParameter]
+
     def __init__(self, dev: OdorDelivery, taskRunner):
         super().__init__(dev, taskRunner)
         self._events = []
@@ -269,7 +271,7 @@ class OdorTaskGui(TaskGui):
 
         # TODO validate if the events will go longer than the total task runner
 
-    def _addNewOdorEvent(self):  # ignore args: self, typ
+    def _addNewOdorEvent(self) -> OdorEventParameter:  # ignore signal args: self, typ
         ev = OdorEventParameter(name=f"Event {self._next_event_number}", removable=True)
         self._next_event_number += 1
         ev.addChildren(
@@ -289,6 +291,7 @@ class OdorTaskGui(TaskGui):
         self._events.append(ev)
         ev.sigRemoved.connect(self._handleEventRemoval)
         self._redrawPlot()
+        return ev
 
     def _handleEventRemoval(self, event):
         self._events = [ev for ev in self._events if ev != event]
@@ -331,10 +334,13 @@ class OdorTaskGui(TaskGui):
         self.sigSequenceChanged.emit(self.dev.name())
 
     def saveState(self):
-        raise "TODO"
+        return [ev.saveState(filter="user") for ev in self._events]
 
     def restoreState(self, state):
-        raise "TODO"
+        for eventState in state:
+            ev = self._addNewOdorEvent()
+            ev.restoreState(eventState)
+        self._redrawPlot()
 
     def generateTask(self, params=None):
         if params is None:
