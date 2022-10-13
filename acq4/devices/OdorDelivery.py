@@ -95,17 +95,21 @@ class OdorDevGui(Qt.QWidget):
         self.layout = Qt.FlowLayout()
         self.setLayout(self.layout)
         self._buttonGroups = {}
+        self._groupButtons = {}
         self._controlButtons = {}
         self._setupOdorButtons()
 
     def _setupOdorButtons(self):
+        first = True
         for group_name, group_config in self.dev.odors.items():
             channel = group_config["channel"]
             group_box = Qt.QGroupBox(f"{channel}: {group_name}")
+            self._groupButtons[group_name] = group_box
             group_box.setCheckable(True)
-            group_box.setChecked(True)
+            group_box.setChecked(first)
+            first = False
             group_box.setObjectName(group_name)
-            group_box.clicked.connect(self._handleOffButtonPush)
+            group_box.clicked.connect(self._handleChannelButtonPush)
             group_layout = Qt.FlowLayout()
             group_box.setLayout(group_layout)
             self.layout.addWidget(group_box)
@@ -133,7 +137,7 @@ class OdorDevGui(Qt.QWidget):
                     self._controlButtons[group_name] = button
                     button.setChecked(True)
 
-    def _handleOffButtonPush(self, enabled):
+    def _handleChannelButtonPush(self, enabled):
         btn = self.sender()
         group_name = btn.objectName()
         channel = self.dev.odors[group_name]["channel"]
@@ -144,6 +148,9 @@ class OdorDevGui(Qt.QWidget):
                     channel, port = map(int, button.objectName().split(":"))
                     if port != 1:
                         self.dev.setChannelValue(channel, port)
+            for group in self._groupButtons:
+                if group != group_name:
+                    self._groupButtons[group].setChecked(False)
         else:
             self._controlButtons[group_name].setChecked(True)
 
