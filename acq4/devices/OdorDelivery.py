@@ -332,6 +332,8 @@ class OdorTaskGui(TaskGui):
     def generateTask(self, params=None):
         if params is None:
             params = {}
+        paramSpace = self.listSequence()
+        params = {k: paramSpace[k][v] for k, v in params.items()}
         for ev in self._events:
             params.setdefault(f"{ev.name()} Start Time", ev["Start Time"])
             params.setdefault(f"{ev.name()} Duration", ev["Duration"])
