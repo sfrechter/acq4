@@ -13,7 +13,8 @@ import six
 import acq4.Manager as Manager
 import acq4.util.ptime as ptime
 from pyqtgraph import PlotWidget, mkPen
-from pyqtgraph import WidgetGroup, MetaArray
+from pyqtgraph import WidgetGroup
+from MetaArray import MetaArray
 from pyqtgraph import siFormat
 from pyqtgraph.debug import Profiler
 from acq4.util import Qt

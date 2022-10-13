@@ -10,7 +10,7 @@ import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.dockarea as dockarea
 from pyqtgraph.graphicsItems.ROI import RulerROI
-from pyqtgraph.metaarray import MetaArray
+from MetaArray import MetaArray
 from six.moves import range
 
 import acq4.Manager as Manager

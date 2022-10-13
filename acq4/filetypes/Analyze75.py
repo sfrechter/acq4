@@ -6,7 +6,7 @@ import six
 from six.moves import range
 from six.moves import reduce
 
-from pyqtgraph.metaarray import MetaArray
+from MetaArray import MetaArray
 from .FileType import FileType
 
 

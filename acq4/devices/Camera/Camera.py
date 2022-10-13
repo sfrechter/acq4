@@ -6,7 +6,8 @@ import time
 
 import numpy as np
 import pyqtgraph as pg
-from pyqtgraph import Vector, SRTTransform3D, MetaArray
+from pyqtgraph import Vector, SRTTransform3D
+from MetaArray import MetaArray
 from pyqtgraph.debug import Profiler
 from pyqtgraph.metaarray import axis
 from six.moves import range
