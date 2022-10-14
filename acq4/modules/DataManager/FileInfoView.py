@@ -173,12 +173,17 @@ class FileInfoView(Qt.QWidget):
             t0 = file.parent().info()['__timestamp__']
 
         if file.fileType() == "YamlFile":
-            self._splatDictIntoRows(file.read(), t0)
+            data = file.read()
+            self._splatDataIntoRows(data, t0)
 
         # Add fields for any other keys that happen to be present
-        self._splatDictIntoRows({f: info[f] for f in infoKeys}, t0)
+        self._splatDataIntoRows({f: info[f] for f in infoKeys}, t0)
 
-    def _splatDictIntoRows(self, data: dict, t0: "float | None" = None):
+    def _splatDataIntoRows(self, data, t0: "float | None" = None):
+        if not isinstance(data, dict):
+            for value in data:
+                self._splatDataIntoRows(value, t0)
+            return
         for key, value in data.items():
             if isinstance(value, dict):
                 w = DictView(value)

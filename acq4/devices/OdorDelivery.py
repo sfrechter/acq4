@@ -415,7 +415,7 @@ class OdorTask(DeviceTask):
         while odor := cmd.get(f"Event {i} Odor"):
             cmd[f"Event {i} Odor Details"] = self.dev.odorDetails(odor)
             i += 1
-        return cmd
+        return [cmd]
 
     def start(self):
         self._future = OdorFuture(self.dev, self._events)
