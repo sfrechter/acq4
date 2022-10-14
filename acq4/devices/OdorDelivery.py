@@ -56,7 +56,7 @@ class OdorDelivery(Device):
             if self.odors[chan_name]["channel"] == odor[0]:
                 port_name = self.odors[chan_name]["ports"][odor[1]]
                 return f"{chan_name}: {port_name}"
-        raise ValueError("Invalid odor specification")
+        raise ValueError(f"Invalid odor specification: {odor}")
 
     def odorsAsParameterLimits(self) -> Dict[str, Tuple[int, int]]:
         return {
@@ -64,6 +64,12 @@ class OdorDelivery(Device):
             for chanName, chanOpts in self.odors.items()
             for port, name in chanOpts["ports"].items()
         }
+
+    def channelName(self, channel: int) -> str:
+        for chan_name in self.odors:
+            if self.odors[chan_name]["channel"] == channel:
+                return chan_name
+        raise ValueError(f"Invalid channel: {channel}")
 
     def setChannelValue(self, channel: int, value: int) -> None:
         """Turn a given odor channel value"""
@@ -289,7 +295,7 @@ class OdorTaskGui(TaskGui):
                     name="Odor",
                     type="list",
                     limits=self.dev.odorsAsParameterLimits(),
-                    group_by={"channel": lambda name, address: str(address[0])},  # TODO channel name in here
+                    group_by={"channel": lambda name, address: self.dev.channelName(address[0])},
                 ),
             ]
         )
