@@ -51,6 +51,13 @@ class OdorDelivery(Device):
     def odorChannels(self) -> List[int]:
         return sorted([gr["channel"] for gr in self.odors.values()])
 
+    def odorDetails(self, odor: Tuple[int, int]) -> str:
+        for chan_name in self.odors:
+            if self.odors[chan_name]["channel"] == odor[0]:
+                port_name = self.odors[chan_name]["ports"][odor[1]]
+                return f"{chan_name}: {port_name}"
+        raise ValueError("Invalid odor specification")
+
     def odorsAsParameterLimits(self) -> Dict[str, Tuple[int, int]]:
         return {
             f"{chanName}[{port}]: {name}": (chanOpts["channel"], port)
@@ -397,8 +404,12 @@ class OdorTask(DeviceTask):
         return self._future is not None and self._future.isDone()
 
     def getResult(self):
-        # TODO format? ndarray with vals at expected time points, or just the config?
-        return self._events
+        cmd = self._cmd.copy()
+        i = 0
+        while odor := cmd.get(f"Event {i} Odor"):
+            cmd[f"Event {i} Odor Details"] = self.dev.odorDetails(odor)
+            i += 1
+        return cmd
 
     def start(self):
         self._future = OdorFuture(self.dev, self._events)
