@@ -118,11 +118,9 @@ class OdorDevGui(Qt.QWidget):
             channel = group_config["channel"]
             group_box = Qt.QGroupBox(f"{channel}: {group_name}")
             self._groupButtons[group_name] = group_box
-            group_box.setCheckable(True)
-            group_box.setChecked(first)
-            first = False
             group_box.setObjectName(group_name)
-            group_box.clicked.connect(self._handleChannelButtonPush)
+            group_box.toggled.connect(self._handleChannelButtonPush)
+            group_box.setCheckable(True)
             group_layout = Qt.FlowLayout()
             group_box.setLayout(group_layout)
             self.layout.addWidget(group_box)
@@ -149,6 +147,9 @@ class OdorDevGui(Qt.QWidget):
                 if port == 1:
                     self._controlButtons[group_name] = button
                     button.setChecked(True)
+            group_box.setChecked(False)  # needed to guarantee toggle signal
+            group_box.setChecked(first)
+            first = False
 
     def _handleChannelButtonPush(self, enabled):
         btn = self.sender()
