@@ -595,7 +595,7 @@ class MoveFuture(Future):
 
     def __init__(self, dev, pos, speed):
         Future.__init__(self)
-        self.startTime = pg.ptime.time()
+        self.startTime = ptime.time()
         self.dev = dev
         self.speed = speed
         self.targetPos = np.asarray(pos)

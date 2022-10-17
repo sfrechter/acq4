@@ -1,6 +1,5 @@
 import numpy as np
-from acq4.util import Qt
-from pyqtgraph import ptime
+from acq4.util import Qt, ptime
 from acq4.devices.PatchPipette.testpulse import TestPulse
 
 

@@ -1,3 +1,4 @@
-# -*- coding: utf-8 -*-
-from __future__ import print_function
-from pyqtgraph.ptime import time
+from time import perf_counter as time
+
+
+__all__ = ["time"]

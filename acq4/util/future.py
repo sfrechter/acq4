@@ -4,8 +4,9 @@ import threading
 import time
 import traceback
 
-from acq4.util import Qt
 from pyqtgraph import ptime
+
+from acq4.util import Qt, ptime
 
 
 class Future(Qt.QObject):

@@ -25,7 +25,7 @@ try:
 except ImportError:
     from threading import RLock
 
-from pyqtgraph import ptime
+from acq4.util import ptime
 
 from .tmcm import TMCM140, TMCMError
 

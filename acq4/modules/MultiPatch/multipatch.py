@@ -5,7 +5,7 @@ import os, re
 import numpy as np
 import json
 from collections import OrderedDict
-from acq4.util import Qt
+from acq4.util import Qt, ptime
 
 from acq4.modules.Module import Module
 from acq4 import getManager
@@ -547,7 +547,7 @@ class MultiPatchWindow(Qt.QWidget):
     def surfaceDepthChanged(self, depth):
         event = OrderedDict([
             ("device", str(self.microscope.name())),
-            ("event_time", pg.ptime.time()),
+            ("event_time", ptime.time()),
             ("event", "surface_depth_changed"),
             ("surface_depth", depth),
         ])
