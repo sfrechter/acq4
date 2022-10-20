@@ -1,17 +1,10 @@
-# -*- coding: utf-8 -*-
-from __future__ import print_function, with_statement
-
+import numpy as np
 import threading
 import time
-
-import numpy as np
-import pyqtgraph as pg
-from pyqtgraph import Vector, SRTTransform3D
-from MetaArray import MetaArray
-from pyqtgraph.debug import Profiler
-from pyqtgraph.metaarray import axis
 from six.moves import range
 
+import pyqtgraph as pg
+from MetaArray import MetaArray, axis
 from acq4.devices.DAQGeneric import DAQGeneric, DAQGenericTask
 from acq4.devices.Microscope import Microscope
 from acq4.devices.OptomechDevice import OptomechDevice
@@ -20,6 +13,8 @@ from acq4.util import imaging
 from acq4.util.Mutex import Mutex
 from acq4.util.Thread import Thread
 from acq4.util.debug import printExc
+from pyqtgraph import Vector, SRTTransform3D
+from pyqtgraph.debug import Profiler
 from .CameraInterface import CameraInterface
 from .deviceGUI import CameraDeviceGui
 from .taskGUI import CameraTaskGui

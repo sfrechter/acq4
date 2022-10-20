@@ -3,7 +3,7 @@ import time
 from scipy import stats
 from six.moves import range
 
-import pyqtgraph.metaarray as metaarray
+from MetaArray import MetaArray
 from acq4.Manager import getManager, logMsg
 from acq4.devices.DAQGeneric import DAQGeneric, DAQGenericTask
 from acq4.devices.NiDAQ.nidaq import NiDAQ
@@ -870,7 +870,7 @@ class LaserTask(DAQGenericTask):
         
         result._info[-1]['Laser'] = info
         
-        result = metaarray.MetaArray(arr, info=result._info)
+        result = MetaArray(arr, info=result._info)
         self.dev.lastResult = result
        
         return result
