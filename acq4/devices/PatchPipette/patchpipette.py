@@ -1,14 +1,15 @@
-from __future__ import print_function
-import numpy as np
 from collections import OrderedDict
 
-from ..Camera import Camera
-from ..Device import Device
-from acq4.util import Qt, ptime
+import numpy as np
+import time
+
+from acq4.util import Qt
 from acq4.util.Mutex import Mutex
 from .devgui import PatchPipetteDeviceGui
-from .testpulse import TestPulseThread
 from .statemanager import PatchPipetteStateManager
+from .testpulse import TestPulseThread
+from ..Camera import Camera
+from ..Device import Device
 
 
 class PatchPipette(Device):
@@ -412,7 +413,7 @@ class PatchPipette(Device):
     def emitNewEvent(self, eventType, eventData=None):
         newEv = OrderedDict([
             ('device', self.name()),
-            ('event_time', ptime.time()),
+            ('event_time', time.perf_counter()),
             ('event', eventType),
         ])
         if eventData is not None:

@@ -12,7 +12,6 @@ from pyqtgraph.debug import Profiler
 from pyqtgraph.metaarray import axis
 from six.moves import range
 
-import acq4.util.ptime as ptime
 from acq4.devices.DAQGeneric import DAQGeneric, DAQGenericTask
 from acq4.devices.Microscope import Microscope
 from acq4.devices.OptomechDevice import OptomechDevice
@@ -280,7 +279,7 @@ class Camera(DAQGeneric, OptomechDevice):
         info["objective"] = ss.get("objective", None)
         info["lightSource"] = ss.get("lightSourceState", None)
         info["deviceTransform"] = pg.SRTTransform3D(ss["transform"])
-        info["time"] = ptime.time()
+        info["time"] = time.perf_counter()
 
         f = Frame(frames, info)
         self.newFrame(f)  # allow others access to this frame (for example, camera module can update)
@@ -841,12 +840,12 @@ class AcquireThread(Thread):
             self.dev.startCamera()
             self.cameraStartEvent.set()
 
-            lastFrameTime = lastStopCheck = ptime.time()
+            lastFrameTime = lastStopCheck = time.perf_counter()
             frameInfo = {}
             scopeState = None
 
             while True:
-                now = ptime.time()
+                now = time.perf_counter()
                 frames = self.dev.newFrames()
 
                 # If a new frame is available, process it and inform other threads
@@ -912,7 +911,7 @@ class AcquireThread(Thread):
                         break
                     self.lock.unlock()
 
-                    diff = ptime.time() - lastFrameTime
+                    diff = time.perf_counter() - lastFrameTime
                     if diff > (10 + exposure):
                         if mode == "Normal":
                             self.dev.noFrameWarning(diff)

@@ -6,7 +6,7 @@ import time
 import numpy as np
 
 from acq4.devices.Stage import Stage, MoveFuture
-from acq4.util import Qt, ptime
+from acq4.util import Qt
 from acq4.util.Mutex import Mutex
 from acq4.util.Thread import Thread
 
@@ -198,7 +198,7 @@ class MockStageThread(Thread):
         
     def start(self):
         self._quit = False
-        self.lastUpdate = ptime.time()
+        self.lastUpdate = time.perf_counter()
         Thread.start(self)
         
     def stop(self):
@@ -232,7 +232,7 @@ class MockStageThread(Thread):
             return self.pos.copy()
     
     def run(self):
-        lastUpdate = ptime.time()
+        lastUpdate = time.perf_counter()
         while True:
             with self.lock:
                 if self._quit:
@@ -243,7 +243,7 @@ class MockStageThread(Thread):
                 currentMove = self.currentMove
                 pos = self.pos
                 
-            now = ptime.time()
+            now = time.perf_counter()
             dt = now - lastUpdate
             lastUpdate = now
             
