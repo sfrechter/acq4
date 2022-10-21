@@ -2,12 +2,13 @@ import contextlib
 import math
 import sys
 import threading
+import time
 from typing import Tuple
 
 import numpy as np
+import pyqtgraph as pg
 from six.moves import range
 
-import pyqtgraph as pg
 from acq4.util import Qt
 from acq4.util.Mutex import Mutex
 from .calibration import ManipulatorAxesCalibrationWindow, StageAxesCalibrationWindow
@@ -595,7 +596,7 @@ class MoveFuture(Future):
 
     def __init__(self, dev, pos, speed):
         Future.__init__(self)
-        self.startTime = ptime.time()
+        self.startTime = time.perf_counter()
         self.dev = dev
         self.speed = speed
         self.targetPos = np.asarray(pos)

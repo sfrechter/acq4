@@ -6,7 +6,6 @@ import time
 from functools import lru_cache
 from six.moves import range
 
-import acq4.util.ptime as ptime
 from acq4.devices.Camera import Camera
 from acq4.util import micromanager
 from acq4.util.Mutex import RecursiveMutex
@@ -90,14 +89,14 @@ class MicroManagerCamera(Camera):
         self.mmc.startSequenceAcquisition(n, 0, True)
         frames = []
         frameTimes = []
-        timeoutStart = ptime.time()
+        timeoutStart = time.perf_counter()
         while self.mmc.isSequenceRunning() or self.mmc.getRemainingImageCount() > 0:
             if self.mmc.getRemainingImageCount() > 0:
-                frameTimes.append(ptime.time())
+                frameTimes.append(time.perf_counter())
                 timeoutStart = frameTimes[-1]
                 frames.append(self.mmc.popNextImage().T[np.newaxis, ...])
             else:
-                if ptime.time() - timeoutStart > 10.0:
+                if time.perf_counter() - timeoutStart > 10.0:
                     raise Exception("Timed out waiting for camera frame.")
                 time.sleep(0.005)
         if len(frames) < n:
@@ -116,7 +115,7 @@ class MicroManagerCamera(Camera):
             if nFrames == 0:
                 return []
 
-        now = ptime.time()
+        now = time.perf_counter()
         if self.lastFrameTime is None:
             self.lastFrameTime = now
 
