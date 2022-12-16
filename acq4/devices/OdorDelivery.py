@@ -5,7 +5,7 @@ import numpy as np
 import threading
 from datetime import datetime
 from time import sleep
-from typing import Union, List, Dict, Tuple, Any
+from typing import Union, List, Dict, Tuple
 
 from pyqtgraph import PlotWidget, intColor, mkPen
 from pyqtgraph.parametertree import ParameterTree
@@ -127,13 +127,17 @@ class OdorDevGui(Qt.QWidget):
             button_group = Qt.QButtonGroup()
             self._buttonGroups[group_name] = button_group
 
+            def _add_button(btn):
+                group_layout.addWidget(btn)
+                button_group.addButton(btn)
+                btn.clicked.connect(self._handleOdorButtonPush)
+
             if 1 not in group_config["ports"]:
                 control_button = Qt.QRadioButton(f"{channel}[1]: Control")
                 control_button.setObjectName(f"{channel}:1")
                 control_button.setChecked(True)
-                group_layout.addWidget(control_button)
-                button_group.addButton(control_button)
-                control_button.clicked.connect(self._handleOdorButtonPush)
+                _add_button(control_button)
+
                 self._controlButtons[group_name] = control_button
 
             for port, odor in group_config["ports"].items():
@@ -141,9 +145,7 @@ class OdorDevGui(Qt.QWidget):
                     continue
                 button = Qt.QRadioButton(f"{channel}[{port}]: {odor}")
                 button.setObjectName(f"{channel}:{port}")
-                group_layout.addWidget(button)
-                button_group.addButton(button)
-                button.clicked.connect(self._handleOdorButtonPush)
+                _add_button(button)
                 if port == 1:
                     self._controlButtons[group_name] = button
                     button.setChecked(True)
