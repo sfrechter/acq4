@@ -460,6 +460,7 @@ class OdorFuture(Future):
                 action_needed = False
                 if chan not in chan_values:
                     chan_values[chan] = 1  # initialize to control
+                    action_needed = True
                 end_time = event.startTime + event.duration
                 if now >= end_time:  # turn off this port after time is up
                     if chan_values[chan] & port > 0:
