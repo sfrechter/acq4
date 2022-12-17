@@ -446,7 +446,7 @@ class OdorFuture(Future):
     def _executeSchedule(self):
         # TODO this spec is duplicated in the graphing code
         start = datetime.now()
-        chan_values = {}
+        chan_values = {ev.odor[0]: 0 for ev in self._schedule}
         while True:
             sleep(0.01)
             now = (datetime.now() - start).total_seconds()
@@ -458,9 +458,6 @@ class OdorFuture(Future):
             for event in self._schedule:
                 chan, port = event.odor
                 action_needed = False
-                if chan not in chan_values:
-                    chan_values[chan] = 1  # initialize to control
-                    action_needed = True
                 end_time = event.startTime + event.duration
                 if now >= end_time:  # turn off this port after time is up
                     if chan_values[chan] & port > 0:
