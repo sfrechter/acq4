@@ -12,10 +12,11 @@ def test_single_task():
     dev.setChannelValue = MagicMock()
     cmd = {"Event 0 Start Time": 0, "Event 0 Duration": 0.3, "Event 0 Odor": (0, 2)}
     task = OdorTask(dev, cmd, MagicMock())
+    task.configure()
     task.start()
     while not task.isDone():
         time.sleep(0.1)
-    dev.setChannelValue.assert_has_calls([call(0, 1), call(0, 2), call(0, 0)])
+    dev.setChannelValue.assert_has_calls([call(0, 1), call(0, 2), call(0, 1)])
 
 
 def test_two_tasks():
@@ -23,7 +24,7 @@ def test_two_tasks():
     dev = MockOdorDelivery(MagicMock(), cfg, "test odors")
     dev.setChannelValue = MagicMock()
     cmd = {
-        "Event 0 Start Time": 0,
+        "Event 0 Start Time": 0.01,
         "Event 0 Duration": 0.3,
         "Event 0 Odor": (0, 2),
         "Event 1 Start Time": 0.1,
@@ -31,10 +32,11 @@ def test_two_tasks():
         "Event 1 Odor": (0, 4),
     }
     task = OdorTask(dev, cmd, MagicMock())
+    task.configure()
     task.start()
     while not task.isDone():
         time.sleep(0.1)
-    dev.setChannelValue.assert_has_calls([call(0, 1), call(0, 2), call(0, 6), call(0, 4), call(0, 0)])
+    dev.setChannelValue.assert_has_calls([call(0, 1), call(0, 2), call(0, 6), call(0, 4), call(0, 1)])
 
 
 def test_sequence_compile():

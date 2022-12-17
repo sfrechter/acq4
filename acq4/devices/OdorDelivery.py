@@ -451,7 +451,7 @@ class OdorFuture(Future):
             sleep(0.01)
             now = (datetime.now() - start).total_seconds()
             self._time_elapsed = now
-            if now > self._duration:
+            if now > self._duration:  # all done
                 for chan in chan_values:
                     self._dev.setChannelValue(chan, 1)
                 break
