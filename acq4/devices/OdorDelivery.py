@@ -444,6 +444,7 @@ class OdorFuture(Future):
         return 100 * self._time_elapsed / self._duration
 
     def _executeSchedule(self):
+        # TODO this spec is duplicated in the graphing code
         start = datetime.now()
         chan_values = {}
         while True:
@@ -452,23 +453,27 @@ class OdorFuture(Future):
             self._time_elapsed = now
             if now > self._duration:
                 for chan in chan_values:
-                    self._dev.setChannelValue(chan, 0)
+                    self._dev.setChannelValue(chan, 1)
                 break
             for event in self._schedule:
                 chan, port = event.odor
+                action_needed = False
                 if chan not in chan_values:
-                    chan_values[chan] = 1
+                    chan_values[chan] = 1  # initialize to control
                 end_time = event.startTime + event.duration
-                if now >= end_time:
+                if now >= end_time:  # turn off this port after time is up
                     if chan_values[chan] & port > 0:
                         chan_values[chan] ^= port
                         if chan_values[chan] == 0:
-                            chan_values[chan] = 1
-                        self._dev.setChannelValue(chan, chan_values[chan])
-                elif now >= event.startTime:
+                            chan_values[chan] = 1  # ensure at least control is left on
+                        action_needed = True
+                elif now >= event.startTime:  # time to turn on this port
                     if chan_values[chan] & port == 0:
-                        chan_values[chan] &= 0xFE  # Turn off control
+                        chan_values[chan] &= 0xFE  # Turn off control while other ports are on
                         chan_values[chan] |= port
-                        self._dev.setChannelValue(chan, chan_values[chan])
+                        action_needed = True
+
+                if action_needed:
+                    self._dev.setChannelValue(chan, chan_values[chan])
 
         self._isDone = True
