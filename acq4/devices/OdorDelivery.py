@@ -183,7 +183,7 @@ class _ListSeqParameter(ListParameter):
         initialParams = [p.name() for p in self]
         sequence_names = ["off", "select"]
         newParams = [
-            {"name": "sequence", "type": "list", "value": "off", "values": sequence_names},
+            {"name": "sequence", "type": "list", "value": "off", "limits": sequence_names},
             {"name": "select", "type": "checklist", "visible": False, "limits": kwargs["limits"], "exclusive": False},
             {"name": "randomize", "type": "bool", "value": False, "visible": False},
         ]
