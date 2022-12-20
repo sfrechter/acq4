@@ -5,7 +5,7 @@ import numpy as np
 import threading
 from datetime import datetime
 from time import sleep
-from typing import Union, List, Dict, Tuple, Any
+from typing import Union, List, Dict, Tuple
 
 from pyqtgraph import PlotWidget, intColor, mkPen
 from pyqtgraph.parametertree import ParameterTree
@@ -127,13 +127,17 @@ class OdorDevGui(Qt.QWidget):
             button_group = Qt.QButtonGroup()
             self._buttonGroups[group_name] = button_group
 
+            def _add_button(btn):
+                group_layout.addWidget(btn)
+                button_group.addButton(btn)
+                btn.clicked.connect(self._handleOdorButtonPush)
+
             if 1 not in group_config["ports"]:
                 control_button = Qt.QRadioButton(f"{channel}[1]: Control")
                 control_button.setObjectName(f"{channel}:1")
                 control_button.setChecked(True)
-                group_layout.addWidget(control_button)
-                button_group.addButton(control_button)
-                control_button.clicked.connect(self._handleOdorButtonPush)
+                _add_button(control_button)
+
                 self._controlButtons[group_name] = control_button
 
             for port, odor in group_config["ports"].items():
@@ -141,9 +145,7 @@ class OdorDevGui(Qt.QWidget):
                     continue
                 button = Qt.QRadioButton(f"{channel}[{port}]: {odor}")
                 button.setObjectName(f"{channel}:{port}")
-                group_layout.addWidget(button)
-                button_group.addButton(button)
-                button.clicked.connect(self._handleOdorButtonPush)
+                _add_button(button)
                 if port == 1:
                     self._controlButtons[group_name] = button
                     button.setChecked(True)
@@ -181,7 +183,7 @@ class _ListSeqParameter(ListParameter):
         initialParams = [p.name() for p in self]
         sequence_names = ["off", "select"]
         newParams = [
-            {"name": "sequence", "type": "list", "value": "off", "values": sequence_names},
+            {"name": "sequence", "type": "list", "value": "off", "limits": sequence_names},
             {"name": "select", "type": "checklist", "visible": False, "limits": kwargs["limits"], "exclusive": False},
             {"name": "randomize", "type": "bool", "value": False, "visible": False},
         ]
@@ -442,31 +444,34 @@ class OdorFuture(Future):
         return 100 * self._time_elapsed / self._duration
 
     def _executeSchedule(self):
+        # TODO this spec is duplicated in the graphing code
         start = datetime.now()
-        chan_values = {}
+        chan_values = {ev.odor[0]: 0 for ev in self._schedule}
         while True:
             sleep(0.01)
             now = (datetime.now() - start).total_seconds()
             self._time_elapsed = now
-            if now > self._duration:
+            if now > self._duration:  # all done
                 for chan in chan_values:
-                    self._dev.setChannelValue(chan, 0)
+                    self._dev.setChannelValue(chan, 1)
                 break
             for event in self._schedule:
                 chan, port = event.odor
-                if chan not in chan_values:
-                    chan_values[chan] = 1
+                action_needed = False
                 end_time = event.startTime + event.duration
-                if now >= end_time:
+                if now >= end_time:  # turn off this port after time is up
                     if chan_values[chan] & port > 0:
                         chan_values[chan] ^= port
                         if chan_values[chan] == 0:
-                            chan_values[chan] = 1
-                        self._dev.setChannelValue(chan, chan_values[chan])
-                elif now >= event.startTime:
+                            chan_values[chan] = 1  # ensure at least control is left on
+                        action_needed = True
+                elif now >= event.startTime:  # time to turn on this port
                     if chan_values[chan] & port == 0:
-                        chan_values[chan] &= 0xFE  # Turn off control
+                        chan_values[chan] &= 0xFE  # Turn off control while other ports are on
                         chan_values[chan] |= port
-                        self._dev.setChannelValue(chan, chan_values[chan])
+                        action_needed = True
+
+                if action_needed:
+                    self._dev.setChannelValue(chan, chan_values[chan])
 
         self._isDone = True
