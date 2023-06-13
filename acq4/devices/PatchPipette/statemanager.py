@@ -34,6 +34,7 @@ class PatchPipetteStateManager(Qt.QObject):
                 states.PatchPipetteBathState,
                 states.PatchPipetteApproachState,
                 states.PatchPipetteCellDetectState,
+                states.PatchPipetteManSealState,
                 states.PatchPipetteSealState,
                 states.PatchPipetteCellAttachedState,
                 states.PatchPipetteBreakInState,

@@ -837,6 +837,78 @@ class PatchPipetteSealState(PatchPipetteState):
         PatchPipetteState.cleanup(self)
 
 
+class PatchPipetteManSealState(PatchPipetteState):
+    """Pipette in seal with pressure set to atm
+
+    State name: "manual seal"
+
+    - automatically transition to 'break in' after a delay - didnt decide about that yet
+    - monitor for spontaneous break-in or loss of attached cell
+
+    Parameters
+    ----------
+    autoBreakInDelay : float
+        Delay time (seconds) before transitioning to 'break in' state. If None, then never automatically
+        transition to break-in.
+    breakInThreshold : float
+        Capacitance (Farads) above which the pipette is considered to be whole-cell and immediately
+        transitions to the 'break in' state (in case of partial break-in, we don't want to transition
+        directly to 'whole cell' state).
+    holdingCurrentThreshold : float
+        Holding current (Amps) below which the cell is considered to be lost and the state fails.
+    spontaneousBreakInState:
+        Name of state to transition to when the membrane breaks in spontaneously. Default
+        is 'break in' so that partial break-ins will be completed. To disable, set to 'whole cell'.
+    """
+    stateName = 'manual seal'
+    _defaultConfig = {
+        'initialPressureSource': 'atmosphere',
+        'initialClampMode': 'VC',
+        'initialClampHolding': -70e-3,
+        'initialTestPulseEnable': True,
+        'autoBreakInDelay': None,
+        'breakInThreshold': 0.3e-12,
+        'holdingCurrentThreshold': -1e-9,
+        'spontaneousBreakInState': 'whole cell',
+    }
+
+    def run(self):
+        self.monitorTestPulse()
+        patchrec = self.dev.patchRecord()
+        config = self.config
+        startTime = time.perf_counter()
+        delay = config['autoBreakInDelay']
+        while True:
+            if delay is not None and time.perf_counter() - startTime > delay:
+                return 'break in'
+
+            self._checkStop()
+
+            tps = self.getTestPulses(timeout=0.2)
+            if len(tps) == 0:
+                continue
+
+            tp = tps[-1]
+            holding = tp.analysis()['baselineCurrent']
+            if holding < self.config['holdingCurrentThreshold']:
+                self._taskDone(interrupted=True, error='Holding current exceeded threshold.')
+                return
+            
+            cap = tp.analysis()['capacitance']
+            if cap > config['breakInThreshold']:
+                patchrec['spontaneousBreakin'] = True
+                return config['spontaneousBreakInState']
+
+            patchrec['resistanceBeforeBreakin'] = tp.analysis()['steadyStateResistance']
+            patchrec['capacitanceBeforeBreakin'] = cap
+
+
+
+
+
+
+
+
 class PatchPipetteCellAttachedState(PatchPipetteState):
     """Pipette in cell-attached configuration
 
