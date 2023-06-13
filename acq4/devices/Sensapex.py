@@ -197,7 +197,7 @@ class SensapexMoveFuture(MoveFuture):
             return
 
         if self.speed >= 1e-6:
-            assert linear, f"Linear movement required for all speeds >= 1e-6 ({self.speed:g} requested)"
+            # assert linear, f"Linear movement required for all speeds >= 1e-6 ({self.speed:g} requested)"
             self._moveReq = self.dev.dev.goto_pos(pos, self.speed * 1e6, simultaneous=linear, linear=linear)
             self._monitorThread = threading.Thread(target=self._watchForFinish, daemon=True)
         else:
