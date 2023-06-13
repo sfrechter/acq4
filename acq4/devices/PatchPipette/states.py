@@ -551,7 +551,7 @@ class PatchPipetteCellDetectState(PatchPipetteState):
         self.setState(reason)
         self._taskDone()
         patchrec['detectedCell'] = True
-        return "seal"
+        return "manual seal"
 
     def getSearchEndpoint(self):
         """Return the final position along the pipette search path, taking into account 
