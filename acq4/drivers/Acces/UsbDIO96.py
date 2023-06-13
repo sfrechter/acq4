@@ -134,6 +134,9 @@ def handle_config(params):
 
 if __name__ == "__main__":
     device_ids = UsbDIO96.get_device_ids()
+    print(f"Device ids found: {device_ids}")
+    if len(device_ids) == 1:
+        device_ids = [-3]
     devices = [UsbDIO96(i) for i in device_ids]
     print(f"{len(devices)} Acces USB DIO96 device{'s' if len(devices) != 1 else ''} found. Serial numbers:")
     for d in devices:
@@ -149,10 +152,10 @@ if __name__ == "__main__":
     for d in devices:
         for i in output_ports:
             print(f"Turning on port {i} of {d} for 1 second.")
-            d.write(i, 1)
+            d.write(i, 1)  # TODO the second arg is the odor; 1 is "control"
             sleep(1)
             d.write(i, 0)
-        d.write(0, 1)
+        d.write(1, 0)
 
 else:
     handle_config(getManager().config.get("drivers", {}).get("acces", {}))
